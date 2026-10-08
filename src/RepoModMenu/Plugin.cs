@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -72,144 +73,192 @@ namespace RepoModMenu
         private string notificationText = "";
         private float notificationTimer = 0f;
 
-        // IPC Server
-        private HttpListener httpListener;
-        private Thread httpListenerThread;
-        private bool isHttpRunning = false;
+        // Safe Cached States (Main Thread -> Background Thread)
+        private static volatile bool cachedInGame = false;
+        private static volatile int cachedHealth = 100;
+        private static volatile int cachedMaxHealth = 100;
+        private static volatile string cachedItemsJson = "[]";
+
+        // IPC TCP Server (Pure WinSock socket, zero Mono bugs)
+        private TcpListener tcpListener;
+        private Thread tcpListenerThread;
+        private volatile bool isIpcRunning = false;
         private readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
 
         private void Awake()
         {
-            Logger.LogInfo($"{ModName} v{ModVersion} initializing IPC server...");
-            StartHttpServer();
+            Logger.LogInfo($"{ModName} v{ModVersion} initializing IPC TCP server...");
+            StartTcpServer();
         }
 
-        private void StartHttpServer()
+        private void StartTcpServer()
         {
             try
             {
-                httpListener = new HttpListener();
-                httpListener.Prefixes.Add("http://127.0.0.1:29999/");
-                httpListener.Start();
-                isHttpRunning = true;
+                tcpListener = new TcpListener(IPAddress.Loopback, 29999);
+                tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                tcpListener.Start();
+                isIpcRunning = true;
 
-                httpListenerThread = new Thread(HttpServerLoop)
+                tcpListenerThread = new Thread(TcpServerLoop)
                 {
                     IsBackground = true
                 };
-                httpListenerThread.Start();
-                Logger.LogInfo("IPC Server started on http://127.0.0.1:29999/");
+                tcpListenerThread.Start();
+                Logger.LogInfo("IPC TCP Server successfully listening on 127.0.0.1:29999");
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to start IPC Server: {ex.Message}");
+                Logger.LogError($"Failed to start IPC TCP Server: {ex.Message}");
             }
         }
 
-        private void HttpServerLoop()
+        private void TcpServerLoop()
         {
-            while (isHttpRunning && httpListener != null && httpListener.IsListening)
+            while (isIpcRunning && tcpListener != null)
             {
                 try
                 {
-                    var context = httpListener.GetContext();
-                    ThreadPool.QueueUserWorkItem((state) => HandleHttpRequest(context));
+                    var client = tcpListener.AcceptTcpClient();
+                    ThreadPool.QueueUserWorkItem((state) => HandleTcpClient(client));
                 }
-                catch (HttpListenerException) { break; }
+                catch (SocketException) { break; }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"IPC error: {ex.Message}");
+                    Logger.LogError($"TCP accept error: {ex.Message}");
                 }
             }
         }
 
-        private void HandleHttpRequest(HttpListenerContext context)
+        private void HandleTcpClient(TcpClient client)
         {
-            var req = context.Request;
-            var res = context.Response;
-            res.Headers.Add("Access-Control-Allow-Origin", "*");
-            res.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-
-            try
+            using (client)
             {
-                string path = req.Url.AbsolutePath.ToLower();
-
-                if (path == "/api/status")
+                client.ReceiveTimeout = 3000;
+                client.SendTimeout = 3000;
+                try
                 {
-                    bool inGame = PlayerController.instance != null;
-                    int hp = 0, maxHp = 100;
-                    if (inGame)
+                    using (var stream = client.GetStream())
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                    using (var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true })
                     {
-                        var health = GetLocalPlayerHealth(PlayerController.instance);
-                        if (health != null)
+                        string line = reader.ReadLine();
+                        if (string.IsNullOrEmpty(line)) return;
+
+                        bool isHttp = line.StartsWith("GET ", StringComparison.OrdinalIgnoreCase);
+                        string responseBody = "";
+
+                        if (isHttp)
                         {
-                            hp = GetCurrentHealth(health);
-                            maxHp = GetMaxHealth(health);
+                            // Drain remaining HTTP headers
+                            string h;
+                            while (!string.IsNullOrEmpty(h = reader.ReadLine())) { }
+
+                            string[] parts = line.Split(' ');
+                            string rawUrl = parts.Length > 1 ? parts[1] : "/";
+                            responseBody = ProcessIpcRequest(rawUrl, true);
+
+                            byte[] bodyBytes = Encoding.UTF8.GetBytes(responseBody);
+                            string httpResp = $"HTTP/1.1 200 OK\r\n" +
+                                              $"Content-Type: application/json; charset=utf-8\r\n" +
+                                              $"Access-Control-Allow-Origin: *\r\n" +
+                                              $"Connection: close\r\n" +
+                                              $"Content-Length: {bodyBytes.Length}\r\n\r\n" +
+                                              responseBody;
+                            writer.Write(httpResp);
+                        }
+                        else
+                        {
+                            // Raw TCP command: "STATUS", "CMD ...", "ITEMS"
+                            responseBody = ProcessIpcRequest(line, false);
+                            writer.WriteLine(responseBody);
                         }
                     }
-
-                    string json = $"{{\"inGame\":{inGame.ToString().ToLower()}," +
-                                  $"\"health\":{hp}," +
-                                  $"\"maxHealth\":{maxHp}," +
-                                  $"\"speed\":{EnableSpeedHack.ToString().ToLower()}," +
-                                  $"\"speedMultiplier\":{SpeedMultiplier}," +
-                                  $"\"jump\":{EnableInfiniteJump.ToString().ToLower()}," +
-                                  $"\"stamina\":{EnableInfiniteStamina.ToString().ToLower()}," +
-                                  $"\"god\":{EnableGodMode.ToString().ToLower()}," +
-                                  $"\"tumble\":{EnableNoTumble.ToString().ToLower()}," +
-                                  $"\"fullbright\":{EnableFullbright.ToString().ToLower()}}}";
-
-                    SendResponse(res, json, "application/json");
-                    return;
                 }
+                catch { }
+            }
+        }
 
-                if (path == "/api/items")
-                {
-                    var list = new List<string>();
-                    lock (cachedItems)
-                    {
-                        foreach (var it in cachedItems)
-                        {
-                            if (it != null && !string.IsNullOrEmpty(it.itemName)) list.Add(it.itemName);
-                        }
-                    }
-                    string json = "[\"" + string.Join("\",\"", list.ToArray()) + "\"]";
-                    SendResponse(res, json, "application/json");
-                    return;
-                }
+        private string ProcessIpcRequest(string req, bool isHttp)
+        {
+            string cmd = "";
+            string val = "";
 
+            if (isHttp)
+            {
+                string path = req.Split('?')[0].ToLower();
+                if (path == "/api/status") return GetStatusJson();
+                if (path == "/api/items") return cachedItemsJson;
                 if (path == "/api/cmd")
                 {
-                    string cmd = req.QueryString["cmd"] ?? "";
-                    string val = req.QueryString["val"] ?? "";
-
-                    mainThreadActions.Enqueue(() =>
-                    {
-                        ExecuteCommand(cmd, val);
-                    });
-
-                    SendResponse(res, "{\"ok\":true}", "application/json");
-                    return;
+                    cmd = GetQueryParam(req, "cmd");
+                    val = GetQueryParam(req, "val");
                 }
-
-                SendResponse(res, "{\"error\":\"not_found\"}", "application/json", 404);
+                else return "{\"error\":\"not_found\"}";
             }
-            catch (Exception ex)
+            else
             {
-                SendResponse(res, $"{{\"error\":\"{ex.Message}\"}}", "application/json", 500);
+                string trimmed = req.Trim();
+                if (trimmed.Equals("STATUS", StringComparison.OrdinalIgnoreCase)) return GetStatusJson();
+                if (trimmed.Equals("ITEMS", StringComparison.OrdinalIgnoreCase)) return cachedItemsJson;
+                if (trimmed.StartsWith("CMD ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string rest = trimmed.Substring(4).Trim();
+                    int spaceIdx = rest.IndexOf(' ');
+                    if (spaceIdx > 0)
+                    {
+                        cmd = rest.Substring(0, spaceIdx).Trim();
+                        val = rest.Substring(spaceIdx + 1).Trim();
+                    }
+                    else
+                    {
+                        cmd = rest;
+                    }
+                }
+                else return "{\"error\":\"unknown_command\"}";
             }
+
+            if (!string.IsNullOrEmpty(cmd))
+            {
+                mainThreadActions.Enqueue(() =>
+                {
+                    ExecuteCommand(cmd, val);
+                });
+                return "{\"ok\":true}";
+            }
+
+            return "{\"ok\":false}";
         }
 
-        private void SendResponse(HttpListenerResponse res, string text, string contentType, int statusCode = 200)
+        private string GetQueryParam(string url, string key)
         {
-            res.StatusCode = statusCode;
-            res.ContentType = contentType;
-            byte[] buf = Encoding.UTF8.GetBytes(text);
-            res.ContentLength64 = buf.Length;
-            using (var stream = res.OutputStream)
+            int qIdx = url.IndexOf('?');
+            if (qIdx < 0) return "";
+            string query = url.Substring(qIdx + 1);
+            string[] pairs = query.Split('&');
+            foreach (var pair in pairs)
             {
-                stream.Write(buf, 0, buf.Length);
+                string[] kv = pair.Split('=');
+                if (kv.Length >= 2 && kv[0].Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Uri.UnescapeDataString(kv[1]);
+                }
             }
+            return "";
+        }
+
+        private string GetStatusJson()
+        {
+            return $"{{\"inGame\":{cachedInGame.ToString().ToLower()}," +
+                   $"\"health\":{cachedHealth}," +
+                   $"\"maxHealth\":{cachedMaxHealth}," +
+                   $"\"speed\":{EnableSpeedHack.ToString().ToLower()}," +
+                   $"\"speedMultiplier\":{SpeedMultiplier.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}," +
+                   $"\"jump\":{EnableInfiniteJump.ToString().ToLower()}," +
+                   $"\"stamina\":{EnableInfiniteStamina.ToString().ToLower()}," +
+                   $"\"god\":{EnableGodMode.ToString().ToLower()}," +
+                   $"\"tumble\":{EnableNoTumble.ToString().ToLower()}," +
+                   $"\"fullbright\":{EnableFullbright.ToString().ToLower()}}}";
         }
 
         private void ExecuteCommand(string cmd, string val)
@@ -329,10 +378,28 @@ namespace RepoModMenu
             // 1. Thực thi các lệnh IPC được gửi từ ứng dụng ngoài trên Main Thread
             while (mainThreadActions.TryDequeue(out var action))
             {
-                action?.Invoke();
+                try { action?.Invoke(); } catch (Exception ex) { Logger.LogError($"Action error: {ex.Message}"); }
             }
 
-            // 2. Thực thi logic cheat theo từng frame
+            // 2. Cập nhật cache trạng thái Player an toàn cho IPC
+            var localPlayer = PlayerController.instance;
+            cachedInGame = localPlayer != null;
+            if (cachedInGame)
+            {
+                var h = GetLocalPlayerHealth(localPlayer);
+                if (h != null)
+                {
+                    cachedHealth = GetCurrentHealth(h);
+                    cachedMaxHealth = GetMaxHealth(h);
+                }
+            }
+            else
+            {
+                cachedHealth = 100;
+                cachedMaxHealth = 100;
+            }
+
+            // 3. Thực thi logic cheat theo từng frame
             ApplyCheats();
 
             // 3. Quét danh sách item
@@ -499,6 +566,7 @@ namespace RepoModMenu
                 if (items == null) return;
 
                 var added = new HashSet<string>();
+                var names = new List<string>();
                 foreach (var it in items)
                 {
                     if (it != null && !string.IsNullOrEmpty(it.itemName) && !added.Contains(it.itemName))
@@ -506,9 +574,12 @@ namespace RepoModMenu
                         if (it.itemName.StartsWith("ItemUpgrade", StringComparison.OrdinalIgnoreCase)) continue;
                         added.Add(it.itemName);
                         cachedItems.Add(it);
+                        names.Add(it.itemName);
                     }
                 }
                 cachedItems.Sort((a, b) => string.Compare(a.itemName, b.itemName, StringComparison.OrdinalIgnoreCase));
+                names.Sort(StringComparer.OrdinalIgnoreCase);
+                cachedItemsJson = "[\"" + string.Join("\",\"", names.ToArray()) + "\"]";
             }
         }
 
@@ -609,8 +680,8 @@ namespace RepoModMenu
 
         private void OnDestroy()
         {
-            isHttpRunning = false;
-            try { httpListener?.Stop(); } catch { }
+            isIpcRunning = false;
+            try { tcpListener?.Stop(); } catch { }
             if (mapDirectionalLightObj != null) Destroy(mapDirectionalLightObj);
         }
     }

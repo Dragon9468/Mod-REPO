@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Net.Http;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -12,9 +15,6 @@ namespace RepoTrainerApp
     {
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int vKey);
-
-        private static readonly HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        private const string BASE_URL = "http://127.0.0.1:29999";
 
         // UI Controls
         private Label lblStatus;
@@ -396,11 +396,40 @@ namespace RepoTrainerApp
             hotkeyTimer.Start();
         }
 
+        private async Task<string> SendTcpRequestAsync(string command, int timeoutMs = 800)
+        {
+            using (var tcp = new TcpClient())
+            {
+                var connectTask = tcp.ConnectAsync(IPAddress.Loopback, 29999);
+                var timeoutTask = Task.Delay(timeoutMs);
+                var completed = await Task.WhenAny(connectTask, timeoutTask);
+                if (completed == timeoutTask || !tcp.Connected)
+                {
+                    throw new TimeoutException("Connection timed out");
+                }
+
+                using (var stream = tcp.GetStream())
+                using (var reader = new StreamReader(stream, Encoding.UTF8))
+                using (var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true })
+                {
+                    await writer.WriteLineAsync(command);
+                    var readTask = reader.ReadLineAsync();
+                    var readTimeout = await Task.WhenAny(readTask, Task.Delay(timeoutMs));
+                    if (readTimeout != readTask) throw new TimeoutException("Read timed out");
+                    return await readTask;
+                }
+            }
+        }
+
+        private int itemFetchCounter = 0;
+
         private async Task PollGameStatus()
         {
             try
             {
-                var res = await client.GetStringAsync($"{BASE_URL}/api/status");
+                var res = await SendTcpRequestAsync("STATUS", 600);
+                if (string.IsNullOrEmpty(res)) throw new Exception("Empty response");
+
                 lblStatus.Text = "🟢 ĐÃ KẾT NỐI VỚI GAME R.E.P.O (SẴN SÀNG CHEAT)";
                 lblStatus.ForeColor = Color.LightGreen;
 
@@ -425,6 +454,13 @@ namespace RepoTrainerApp
                         string maxPart = res.Substring(idxMax + 12, commaMax - (idxMax + 12));
                         lblHealth.Text = $"Máu hiện tại: {hpPart} / {maxPart} HP";
                     }
+
+                    // Tự động quét thêm đồ từ game nếu có
+                    if (++itemFetchCounter >= 5)
+                    {
+                        itemFetchCounter = 0;
+                        await FetchItemsFromGame();
+                    }
                 }
                 else
                 {
@@ -439,11 +475,37 @@ namespace RepoTrainerApp
             }
         }
 
+        private async Task FetchItemsFromGame()
+        {
+            try
+            {
+                var json = await SendTcpRequestAsync("ITEMS", 800);
+                if (!string.IsNullOrEmpty(json) && json.Length > 2)
+                {
+                    string inner = json.Trim('[', ']');
+                    var items = inner.Split(',');
+                    bool changed = false;
+                    foreach (var item in items)
+                    {
+                        string clean = item.Trim('"', ' ', '\r', '\n');
+                        if (!string.IsNullOrEmpty(clean) && !allItemNames.Contains(clean))
+                        {
+                            allItemNames.Add(clean);
+                            changed = true;
+                        }
+                    }
+                    if (changed) FilterItemsList(txtSearchItem.Text);
+                }
+            }
+            catch { }
+        }
+
         private async Task SendCommand(string cmd, string val = "")
         {
             try
             {
-                await client.GetStringAsync($"{BASE_URL}/api/cmd?cmd={cmd}&val={Uri.EscapeDataString(val)}");
+                string payload = string.IsNullOrEmpty(val) ? $"CMD {cmd}" : $"CMD {cmd} {val}";
+                await SendTcpRequestAsync(payload, 1000);
                 System.Media.SystemSounds.Beep.Play();
             }
             catch { }
