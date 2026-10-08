@@ -12,11 +12,13 @@ Bản mod menu dạng rời rạc (Standalone & Portable) dành cho game **R.E.P
    - Khi chuyển sang máy mới: Chỉ cần tải/copy thư mục `dist/REPO_Portable_Mod` và dán vào thư mục cài đặt game là chơi được ngay.
 2. **Giao diện Menu trực quan (In-game IMGUI):**
    - Bấm **`Insert`** hoặc **`F1`** để ẩn/hiện menu ngay trong game.
-   - Cửa sổ phân chia các Tab rõ ràng, có thanh trượt điều chỉnh tốc độ, có thể kéo thả tự do.
+   - Cửa sổ phân chia các Tab rõ ràng, có thanh trượt điều chỉnh, có thể kéo thả tự do.
 3. **Phím tắt nhanh (Hotkeys) trong trận:**
    - Kích hoạt tức thì bằng một phím bấm khi đang chạy trốn quái vật, có thông báo nhỏ (Toast) trên màn hình.
-4. **Không giới hạn thời gian:**
-   - Chạy vĩnh viễn, không cần tài khoản, không quảng cáo.
+4. **Hệ thống X-Ray ESP (Nhìn xuyên tường):**
+   - Định vị quái vật (màu Đỏ), vật phẩm & tiền quý (màu Vàng) và đồng đội (màu Xanh) kèm khoảng cách chính xác theo thời gian thực.
+5. **Hệ thống Nâng cấp nhân vật (Perks & Grabber):**
+   - 1-Click Max tất cả nâng cấp: +150 HP, +5 Extra Jumps, x2 Thể lực, Tầm với tay cầm đồ siêu xa (15m), nhấc đồ nặng như lông hồng, ném đồ cực mạnh, mở khóa Đôi Cánh (Tumble Wings) rơi không ngã.
 
 ---
 
@@ -31,11 +33,22 @@ Bản mod menu dạng rời rạc (Standalone & Portable) dành cho game **R.E.P
 | **F5** | **God Mode** | Bất tử, không bị trừ máu khi bị quái cắn |
 | **F6** | **Anti-Tumble / No Fall** | Chống ngã / trượt chân / lộn nhào khi va chạm mạnh |
 | **F7** | **Fullbright / Nightvision** | Tạo nguồn sáng cá nhân tỏa rộng xung quanh |
+| **F8** | **X-Ray ESP** | Bật / Tắt nhìn xuyên tường thấy Quái, Đồ và Bạn bè |
 
-### Tính năng tức thời (Trong tab Player):
-- **Instant Heal:** Hồi phục 100% máu lập tức.
-- **Instant Revive:** Tự hồi sinh tại chỗ ngay khi vừa chết.
-- **Feather Fall:** Rơi chậm như lông vũ trong 10 giây.
+---
+
+## 🛡️ Hoạt động khi là Client vào phòng người khác (Multiplayer)
+
+* **Hoạt động 100%:**
+  - Speed Hack (Chạy siêu nhanh)
+  - Infinite Double Jump (Bay nhảy trên không)
+  - Infinite Stamina (Thể lực vô tận)
+  - X-Ray ESP (Nhìn xuyên tường quái vật, vật phẩm và đồng đội)
+  - Fullbright (Đèn sáng cá nhân)
+  - Chống ngã (Anti-Tumble)
+  - Siêu tay cầm đồ (Tầm với xa, lực nhấc khỏe, ném xa)
+  - Đôi Cánh (Tumble Wings)
+* **Lưu ý:** Vì game xử lý chuyển động và đồ họa ở máy bạn (Client-Authoritative), các tính năng trên hoạt động mượt mà trong bất kỳ phòng nào mà không lo bị chặn bởi Host.
 
 ---
 
@@ -63,16 +76,10 @@ dist/REPO_Portable_Mod/
 
 ## 🛠️ Cách tự chỉnh sửa & Build lại (Dành cho Dev)
 
-### Yêu cầu:
-- .NET SDK 8.0+
-
 ### Lệnh Build:
 ```powershell
 dotnet build src/RepoModMenu/RepoModMenu.csproj -c Release
 ```
-File DLL đầu ra sẽ nằm tại:
-`src/RepoModMenu/bin/Release/netstandard2.1/RepoModMenu.dll`
-
 Sau đó chạy script tự động cài đặt vào game:
 ```powershell
 powershell -ExecutionPolicy Bypass -File install_to_game.ps1

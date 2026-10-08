@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 
@@ -18,7 +17,7 @@ class Program
             var typeDef = mr.GetTypeDefinition(handle);
             string typeName = mr.GetString(typeDef.Name);
 
-            if (typeName == "PlayerController" || typeName == "PlayerHealth")
+            if (typeName == "ValuableObject" || typeName == "PlayerAvatar")
             {
                 Console.WriteLine($"\n=== {typeName} ===");
                 foreach (var fHandle in typeDef.GetFields())
@@ -26,14 +25,10 @@ class Program
                     var f = mr.GetFieldDefinition(fHandle);
                     string name = mr.GetString(f.Name);
                     var attrs = f.Attributes;
-                    Console.WriteLine($"Field: {attrs} -> {name}");
-                }
-                foreach (var mHandle in typeDef.GetMethods())
-                {
-                    var m = mr.GetMethodDefinition(mHandle);
-                    string name = mr.GetString(m.Name);
-                    var attrs = m.Attributes;
-                    Console.WriteLine($"Method: {attrs} -> {name}");
+                    if (name == "dollarValueCurrent" || name == "playerName" || name == "isLocal")
+                    {
+                        Console.WriteLine($"Field: {attrs} -> {name}");
+                    }
                 }
             }
         }

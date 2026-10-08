@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using BepInEx;
 using UnityEngine;
@@ -10,7 +11,7 @@ namespace RepoModMenu
     {
         public const string ModGUID = "com.phong.repocoolmenu";
         public const string ModName = "REPO Master Mod Menu";
-        public const string ModVersion = "1.0.0";
+        public const string ModVersion = "1.1.0";
 
         // Cached Reflection Fields
         private static readonly FieldInfo FieldJumpExtra = typeof(PlayerController).GetField("JumpExtra", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -22,11 +23,19 @@ namespace RepoModMenu
         private static readonly FieldInfo FieldMaxHealth = typeof(PlayerHealth).GetField("maxHealth", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldInvincibleTimer = typeof(PlayerHealth).GetField("invincibleTimer", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
+        private static readonly FieldInfo FieldTumbleWings = typeof(PlayerAvatar).GetField("upgradeTumbleWings", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldTumbleClimb = typeof(PlayerAvatar).GetField("upgradeTumbleClimb", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldCrouchRest = typeof(PlayerAvatar).GetField("upgradeCrouchRest", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly FieldInfo FieldPlayerName = typeof(PlayerAvatar).GetField("playerName", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldIsLocal = typeof(PlayerAvatar).GetField("isLocal", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldDollarValue = typeof(ValuableObject).GetField("dollarValueCurrent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
         // UI State
         private bool isMenuVisible = false;
-        private Rect windowRect = new Rect(40, 40, 380, 500);
+        private Rect windowRect = new Rect(40, 40, 430, 540);
         private int currentTab = 0;
-        private readonly string[] tabNames = new string[] { "Movement", "Player & Stats", "Hotkeys & Info" };
+        private readonly string[] tabNames = new string[] { "Movement", "Health", "Upgrades", "X-Ray ESP", "Hotkeys" };
 
         // Cheats & Settings
         public static bool EnableSpeedHack = false;
@@ -41,6 +50,25 @@ namespace RepoModMenu
         public static bool EnableAntiGravity = false;
         public static bool EnableFullbright = false;
 
+        // Upgrades Modifiers
+        public static float CustomGrabRange = 4f;
+        public static float CustomGrabStrength = 1f;
+        public static float CustomThrowStrength = 1f;
+        private bool upgradesInitialized = false;
+
+        // X-Ray / ESP Settings
+        public static bool EnableESP = false;
+        public static bool EspShowEnemies = true;
+        public static bool EspShowValuables = true;
+        public static bool EspShowPlayers = true;
+        public static float EspMaxDistance = 120f;
+
+        // ESP Caching
+        private float espCacheTimer = 0f;
+        private readonly List<EnemyParent> cachedEnemies = new List<EnemyParent>();
+        private readonly List<ValuableObject> cachedValuables = new List<ValuableObject>();
+        private readonly List<PlayerAvatar> cachedPlayers = new List<PlayerAvatar>();
+
         // Visual / Lighting
         private GameObject fullbrightLightObj;
         private Light fullbrightLight;
@@ -48,6 +76,11 @@ namespace RepoModMenu
         // Notification toast
         private string notificationText = "";
         private float notificationTimer = 0f;
+
+        // GUI Styles
+        private GUIStyle enemyEspStyle;
+        private GUIStyle valuableEspStyle;
+        private GUIStyle playerEspStyle;
 
         private void Awake()
         {
@@ -99,10 +132,27 @@ namespace RepoModMenu
                 ShowNotification($"Fullbright / Nightvision: {(EnableFullbright ? "ON" : "OFF")}");
             }
 
+            if (Input.GetKeyDown(KeyCode.F8))
+            {
+                EnableESP = !EnableESP;
+                ShowNotification($"X-Ray ESP: {(EnableESP ? "ON" : "OFF")}");
+            }
+
             // 3. Thực thi logic cheat theo từng frame
             ApplyCheats();
 
-            // 4. Giảm thời gian thông báo
+            // 4. Cập nhật cache ESP mỗi 0.6 giây
+            if (EnableESP)
+            {
+                espCacheTimer += Time.deltaTime;
+                if (espCacheTimer > 0.6f)
+                {
+                    espCacheTimer = 0f;
+                    RefreshEspCache();
+                }
+            }
+
+            // 5. Giảm thời gian thông báo Toast
             if (notificationTimer > 0f)
             {
                 notificationTimer -= Time.deltaTime;
@@ -141,7 +191,6 @@ namespace RepoModMenu
 
             if (EnableInfiniteJump)
             {
-                // Luôn nạp đầy lượt nhảy trên không (air jumps)
                 FieldJumpExtra?.SetValue(controller, 999);
                 FieldJumpExtraCurrent?.SetValue(controller, 999);
             }
@@ -164,6 +213,23 @@ namespace RepoModMenu
             if (EnableAntiGravity)
             {
                 controller.AntiGravity(1f);
+            }
+
+            // --- Grabber Upgrades / Tay cầm đồ ---
+            if (controller.playerAvatarScript != null && controller.playerAvatarScript.physGrabber != null)
+            {
+                var grabber = controller.playerAvatarScript.physGrabber;
+                if (!upgradesInitialized)
+                {
+                    CustomGrabRange = grabber.grabRange;
+                    CustomGrabStrength = grabber.grabStrength;
+                    CustomThrowStrength = grabber.throwStrength;
+                    upgradesInitialized = true;
+                }
+
+                grabber.grabRange = CustomGrabRange;
+                grabber.grabStrength = CustomGrabStrength;
+                grabber.throwStrength = CustomThrowStrength;
             }
 
             // --- Health & Combat Cheats ---
@@ -219,6 +285,48 @@ namespace RepoModMenu
             }
         }
 
+        private void RefreshEspCache()
+        {
+            cachedEnemies.Clear();
+            cachedValuables.Clear();
+            cachedPlayers.Clear();
+
+            if (EspShowEnemies)
+            {
+                var enemies = FindObjectsOfType<EnemyParent>();
+                if (enemies != null) cachedEnemies.AddRange(enemies);
+            }
+
+            if (EspShowValuables)
+            {
+                var valuables = FindObjectsOfType<ValuableObject>();
+                if (valuables != null) cachedValuables.AddRange(valuables);
+            }
+
+            if (EspShowPlayers)
+            {
+                var players = FindObjectsOfType<PlayerAvatar>();
+                if (players != null)
+                {
+                    foreach (var p in players)
+                    {
+                        if (p != null)
+                        {
+                            bool isLocalPlayer = false;
+                            if (FieldIsLocal != null)
+                            {
+                                isLocalPlayer = (bool)FieldIsLocal.GetValue(p);
+                            }
+                            if (!isLocalPlayer)
+                            {
+                                cachedPlayers.Add(p);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         private PlayerHealth GetLocalPlayerHealth(PlayerController controller)
         {
             if (controller.playerAvatarScript != null && controller.playerAvatarScript.playerHealth != null)
@@ -246,22 +354,142 @@ namespace RepoModMenu
             notificationTimer = 2.5f;
         }
 
+        private void InitStyles()
+        {
+            if (enemyEspStyle == null)
+            {
+                enemyEspStyle = new GUIStyle(GUI.skin.label);
+                enemyEspStyle.fontSize = 12;
+                enemyEspStyle.normal.textColor = Color.red;
+                enemyEspStyle.alignment = TextAnchor.MiddleCenter;
+            }
+
+            if (valuableEspStyle == null)
+            {
+                valuableEspStyle = new GUIStyle(GUI.skin.label);
+                valuableEspStyle.fontSize = 12;
+                valuableEspStyle.normal.textColor = Color.yellow;
+                valuableEspStyle.alignment = TextAnchor.MiddleCenter;
+            }
+
+            if (playerEspStyle == null)
+            {
+                playerEspStyle = new GUIStyle(GUI.skin.label);
+                playerEspStyle.fontSize = 12;
+                playerEspStyle.normal.textColor = Color.cyan;
+                playerEspStyle.alignment = TextAnchor.MiddleCenter;
+            }
+        }
+
         private void OnGUI()
         {
-            // Vẽ thông báo Toast nhỏ góc trên màn hình khi bật/tắt phím tắt
+            InitStyles();
+
+            // 1. Vẽ X-Ray ESP
+            if (EnableESP)
+            {
+                DrawEspOverlay();
+            }
+
+            // 2. Vẽ thông báo Toast nhỏ góc trên màn hình
             if (notificationTimer > 0f)
             {
                 var notifStyle = new GUIStyle(GUI.skin.box);
                 notifStyle.fontSize = 14;
                 notifStyle.normal.textColor = Color.yellow;
-                GUI.Box(new Rect(Screen.width / 2f - 160, 20, 320, 35), $"[MOD] {notificationText}", notifStyle);
+                GUI.Box(new Rect(Screen.width / 2f - 170, 20, 340, 35), $"[MOD] {notificationText}", notifStyle);
             }
 
-            // Vẽ Menu chính nếu đang bật
+            // 3. Vẽ Menu chính
             if (isMenuVisible)
             {
                 GUI.backgroundColor = new Color(0.12f, 0.12f, 0.14f, 0.95f);
                 windowRect = GUI.Window(9999, windowRect, DrawWindowContent, $"★ R.E.P.O Master Menu v{ModVersion} ★");
+            }
+        }
+
+        private void DrawEspOverlay()
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            Vector3 myPos = cam.transform.position;
+
+            // --- Vẽ ESP Quái vật ---
+            if (EspShowEnemies)
+            {
+                foreach (var enemy in cachedEnemies)
+                {
+                    if (enemy == null || !enemy.gameObject.activeInHierarchy) continue;
+
+                    Vector3 pos = enemy.transform.position + Vector3.up * 0.8f;
+                    float dist = Vector3.Distance(myPos, pos);
+                    if (dist > EspMaxDistance) continue;
+
+                    Vector3 screenPos = cam.WorldToScreenPoint(pos);
+                    if (screenPos.z > 0)
+                    {
+                        string name = string.IsNullOrEmpty(enemy.enemyName) ? "Quái vật" : enemy.enemyName;
+                        string text = $"🔴 {name} [{dist:F0}m]";
+                        float y = Screen.height - screenPos.y;
+                        GUI.Label(new Rect(screenPos.x - 100, y - 10, 200, 25), text, enemyEspStyle);
+                    }
+                }
+            }
+
+            // --- Vẽ ESP Vật phẩm / Tiền ---
+            if (EspShowValuables)
+            {
+                foreach (var val in cachedValuables)
+                {
+                    if (val == null || !val.gameObject.activeInHierarchy) continue;
+
+                    Vector3 pos = val.transform.position;
+                    float dist = Vector3.Distance(myPos, pos);
+                    if (dist > EspMaxDistance) continue;
+
+                    Vector3 screenPos = cam.WorldToScreenPoint(pos);
+                    if (screenPos.z > 0)
+                    {
+                        int dollar = 0;
+                        if (FieldDollarValue != null)
+                        {
+                            dollar = (int)FieldDollarValue.GetValue(val);
+                        }
+
+                        string text = $"💰 ${dollar} [{dist:F0}m]";
+                        float y = Screen.height - screenPos.y;
+                        GUI.Label(new Rect(screenPos.x - 100, y - 10, 200, 25), text, valuableEspStyle);
+                    }
+                }
+            }
+
+            // --- Vẽ ESP Đồng đội ---
+            if (EspShowPlayers)
+            {
+                foreach (var player in cachedPlayers)
+                {
+                    if (player == null || !player.gameObject.activeInHierarchy) continue;
+
+                    Vector3 pos = player.transform.position + Vector3.up * 1.5f;
+                    float dist = Vector3.Distance(myPos, pos);
+                    if (dist > EspMaxDistance) continue;
+
+                    Vector3 screenPos = cam.WorldToScreenPoint(pos);
+                    if (screenPos.z > 0)
+                    {
+                        string pName = "Đồng đội";
+                        if (FieldPlayerName != null)
+                        {
+                            var rawName = (string)FieldPlayerName.GetValue(player);
+                            if (!string.IsNullOrEmpty(rawName)) pName = rawName;
+                        }
+
+                        string text = $"👤 {pName} [{dist:F0}m]";
+                        float y = Screen.height - screenPos.y;
+                        GUI.Label(new Rect(screenPos.x - 100, y - 10, 200, 25), text, playerEspStyle);
+                    }
+                }
             }
         }
 
@@ -279,9 +507,15 @@ namespace RepoModMenu
                     DrawMovementTab();
                     break;
                 case 1:
-                    DrawPlayerTab();
+                    DrawHealthTab();
                     break;
                 case 2:
+                    DrawUpgradesTab();
+                    break;
+                case 3:
+                    DrawEspTab();
+                    break;
+                case 4:
                     DrawInfoTab();
                     break;
             }
@@ -330,7 +564,7 @@ namespace RepoModMenu
             }
         }
 
-        private void DrawPlayerTab()
+        private void DrawHealthTab()
         {
             var controller = PlayerController.instance;
             PlayerHealth health = controller != null ? GetLocalPlayerHealth(controller) : null;
@@ -383,6 +617,113 @@ namespace RepoModMenu
             }
         }
 
+        private void DrawUpgradesTab()
+        {
+            var controller = PlayerController.instance;
+            var avatar = controller != null ? controller.playerAvatarScript : null;
+            var health = controller != null ? GetLocalPlayerHealth(controller) : null;
+
+            GUILayout.Label("<b>HỆ THỐNG NÂNG CẤP (PERKS & STATS):</b>");
+
+            if (GUILayout.Button("⭐ MAX TẤT CẢ NÂNG CẤP (1-Click Max All) ⭐", GUILayout.Height(30)))
+            {
+                if (controller != null)
+                {
+                    // Tăng máu tối đa
+                    if (health != null)
+                    {
+                        FieldMaxHealth?.SetValue(health, 250);
+                        FieldHealth?.SetValue(health, 250);
+                    }
+                    // Tăng số lần nhảy hợp lệ
+                    FieldJumpExtra?.SetValue(controller, 5);
+                    // Tăng thể lực gốc
+                    controller.EnergyStart = 200f;
+                    controller.EnergyCurrent = 200f;
+
+                    // Bật cánh bay và leo trèo khi ngã
+                    if (avatar != null)
+                    {
+                        FieldTumbleWings?.SetValue(avatar, true);
+                        FieldTumbleClimb?.SetValue(avatar, true);
+                        FieldCrouchRest?.SetValue(avatar, true);
+                    }
+
+                    // Tăng sức mạnh tay cầm đồ
+                    CustomGrabRange = 15f;
+                    CustomGrabStrength = 5f;
+                    CustomThrowStrength = 3.5f;
+
+                    ShowNotification("Đã Max tất cả chỉ số Nâng Cấp!");
+                }
+                else
+                {
+                    ShowNotification("Vui lòng vào trận trước khi áp dụng!");
+                }
+            }
+
+            GUILayout.Space(10);
+            GUILayout.Label("<b>Tùy chỉnh tay cầm đồ (PhysGrabber):</b>");
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"Tầm với đồ vật: {CustomGrabRange:F1}m", GUILayout.Width(170));
+            CustomGrabRange = GUILayout.HorizontalSlider(CustomGrabRange, 3f, 25f);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"Lực cầm đồ nặng: {CustomGrabStrength:F1}x", GUILayout.Width(170));
+            CustomGrabStrength = GUILayout.HorizontalSlider(CustomGrabStrength, 1f, 10f);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"Lực ném đồ: {CustomThrowStrength:F1}x", GUILayout.Width(170));
+            CustomThrowStrength = GUILayout.HorizontalSlider(CustomThrowStrength, 1f, 8f);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(10);
+            GUILayout.Label("<b>Nâng cấp nhân vật:</b>");
+
+            if (GUILayout.Button("Tăng Máu Tối Đa (+100 Max HP)"))
+            {
+                if (health != null)
+                {
+                    int currentMax = GetMaxHealth(health);
+                    FieldMaxHealth?.SetValue(health, currentMax + 100);
+                    FieldHealth?.SetValue(health, currentMax + 100);
+                    ShowNotification($"Máu tối đa mới: {currentMax + 100} HP");
+                }
+            }
+
+            if (GUILayout.Button("Mở khóa Đôi Cánh (Tumble Wings)"))
+            {
+                if (avatar != null)
+                {
+                    FieldTumbleWings?.SetValue(avatar, true);
+                    ShowNotification("Đã kích hoạt Đôi Cánh khi rơi!");
+                }
+            }
+        }
+
+        private void DrawEspTab()
+        {
+            EnableESP = GUILayout.Toggle(EnableESP, " [F8] Bật X-Ray ESP (Nhìn xuyên tường)");
+
+            GUILayout.Space(10);
+            GUILayout.Label("<b>Bộ lọc hiển thị:</b>");
+            EspShowEnemies = GUILayout.Toggle(EspShowEnemies, " 🔴 Hiện Quái Vật (Enemies)");
+            EspShowValuables = GUILayout.Toggle(EspShowValuables, " 💰 Hiện Vật Phẩm & Tiền (Valuables / Loot)");
+            EspShowPlayers = GUILayout.Toggle(EspShowPlayers, " 👤 Hiện Đồng Đội (Players)");
+
+            GUILayout.Space(10);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"Khoảng cách quét: {EspMaxDistance:F0}m", GUILayout.Width(160));
+            EspMaxDistance = GUILayout.HorizontalSlider(EspMaxDistance, 30f, 250f);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(10);
+            GUILayout.Label($"<i>Đang hiển thị: {cachedEnemies.Count} quái, {cachedValuables.Count} đồ, {cachedPlayers.Count} bạn</i>");
+        }
+
         private void DrawInfoTab()
         {
             GUILayout.Label("<b>DANH SÁCH PHÍM TẮT NHANH (HOTKEYS):</b>");
@@ -393,12 +734,14 @@ namespace RepoModMenu
             GUILayout.Label("• <b>F5</b>: Bật / Tắt Bất tử (God Mode)");
             GUILayout.Label("• <b>F6</b>: Bật / Tắt Chống ngã (Anti-Tumble)");
             GUILayout.Label("• <b>F7</b>: Bật / Tắt Sáng màn hình (Fullbright)");
+            GUILayout.Label("• <b>F8</b>: Bật / Tắt X-Ray ESP (Nhìn xuyên tường)");
 
             GUILayout.Space(10);
-            GUILayout.Label("<b>LƯU Ý VỀ PHẦN MỀM:</b>");
-            GUILayout.Label("• Mod này hoạt động độc lập và vĩnh viễn.");
-            GUILayout.Label("• Không bị giới hạn thời gian (như WeMod/Wand).");
-            GUILayout.Label("• Copy thư mục BepInEx sang máy khác là chơi được ngay.");
+            GUILayout.Label("<b>KHI VÀO LOBBY CỦA NGƯỜI KHÁC (CLIENT):</b>");
+            GUILayout.Label("✔ Speed Hack, Air Jump, Stamina: Hoạt động 100%");
+            GUILayout.Label("✔ X-Ray ESP, Fullbright: Hoạt động 100%");
+            GUILayout.Label("✔ Super Grab (Tầm với xa, ném mạnh): Hoạt động 100%");
+            GUILayout.Label("✔ Upgrades (Wings, Stamina, Max HP): Hoạt động 100%");
         }
 
         private void OnDestroy()
