@@ -17,7 +17,7 @@ class Program
             var typeDef = mr.GetTypeDefinition(handle);
             string typeName = mr.GetString(typeDef.Name);
 
-            if (typeName.StartsWith("PrefabRef", StringComparison.OrdinalIgnoreCase))
+            if (typeName == "InputManager" || typeName == "InputKey")
             {
                 Console.WriteLine($"\n=== {typeName} ===");
                 foreach (var fHandle in typeDef.GetFields())

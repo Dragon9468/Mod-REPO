@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace RepoModMenu
 {
@@ -11,7 +12,7 @@ namespace RepoModMenu
     {
         public const string ModGUID = "com.phong.repocoolmenu";
         public const string ModName = "REPO Master Mod Menu";
-        public const string ModVersion = "1.2.0";
+        public const string ModVersion = "1.3.0";
 
         // Cached Reflection Fields
         private static readonly FieldInfo FieldJumpExtra = typeof(PlayerController).GetField("JumpExtra", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -33,7 +34,7 @@ namespace RepoModMenu
 
         // UI State
         private bool isMenuVisible = false;
-        private Rect windowRect = new Rect(40, 40, 500, 600);
+        private Rect windowRect = new Rect(60, 60, 520, 620);
         private int currentTab = 0;
         private readonly string[] tabNames = new string[] { "Movement", "Health", "Upgrades", "X-Ray ESP", "Balo Items", "Hotkeys" };
 
@@ -87,67 +88,103 @@ namespace RepoModMenu
         private GUIStyle enemyEspStyle;
         private GUIStyle valuableEspStyle;
         private GUIStyle playerEspStyle;
+        private GUIStyle watermarkStyle;
 
         private void Awake()
         {
-            Logger.LogInfo($"{ModName} v{ModVersion} has loaded successfully!");
+            Logger.LogInfo($"{ModName} v{ModVersion} has loaded successfully into game engine!");
+        }
+
+        private bool IsKeyPressed(KeyCode legacyKey, Key newKey)
+        {
+            // 1. Kiểm tra New Input System (Unity 2022 default)
+            try
+            {
+                if (Keyboard.current != null && Keyboard.current[newKey].wasPressedThisFrame)
+                {
+                    return true;
+                }
+            }
+            catch { }
+
+            // 2. Fallback qua Legacy Input
+            try
+            {
+                if (Input.GetKeyDown(legacyKey))
+                {
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
         }
 
         private void Update()
         {
-            // 1. Phím tắt Toggle Menu: [Insert] hoặc [F1]
-            if (Input.GetKeyDown(KeyCode.Insert) || Input.GetKeyDown(KeyCode.F1))
+            // 1. Phím tắt Toggle Menu: [Insert], [F1], hoặc phím [~ / Backquote]
+            if (IsKeyPressed(KeyCode.Insert, Key.Insert) ||
+                IsKeyPressed(KeyCode.F1, Key.F1) ||
+                IsKeyPressed(KeyCode.BackQuote, Key.Backquote) ||
+                IsKeyPressed(KeyCode.Delete, Key.Delete))
             {
-                isMenuVisible = !isMenuVisible;
+                ToggleMenu();
             }
 
             // 2. Hotkeys kích hoạt nhanh trong trận
-            if (Input.GetKeyDown(KeyCode.F2))
+            if (IsKeyPressed(KeyCode.F2, Key.F2))
             {
                 EnableSpeedHack = !EnableSpeedHack;
                 ShowNotification($"Speed Hack: {(EnableSpeedHack ? "ON (" + SpeedMultiplier.ToString("F1") + "x)" : "OFF")}");
             }
 
-            if (Input.GetKeyDown(KeyCode.F3))
+            if (IsKeyPressed(KeyCode.F3, Key.F3))
             {
                 EnableInfiniteJump = !EnableInfiniteJump;
                 ShowNotification($"Infinite Double Jump: {(EnableInfiniteJump ? "ON" : "OFF")}");
             }
 
-            if (Input.GetKeyDown(KeyCode.F4))
+            if (IsKeyPressed(KeyCode.F4, Key.F4))
             {
                 EnableInfiniteStamina = !EnableInfiniteStamina;
                 ShowNotification($"Infinite Stamina: {(EnableInfiniteStamina ? "ON" : "OFF")}");
             }
 
-            if (Input.GetKeyDown(KeyCode.F5))
+            if (IsKeyPressed(KeyCode.F5, Key.F5))
             {
                 EnableGodMode = !EnableGodMode;
                 ShowNotification($"God Mode: {(EnableGodMode ? "ON" : "OFF")}");
             }
 
-            if (Input.GetKeyDown(KeyCode.F6))
+            if (IsKeyPressed(KeyCode.F6, Key.F6))
             {
                 EnableNoTumble = !EnableNoTumble;
                 ShowNotification($"Anti-Tumble / No Fall: {(EnableNoTumble ? "ON" : "OFF")}");
             }
 
-            if (Input.GetKeyDown(KeyCode.F7))
+            if (IsKeyPressed(KeyCode.F7, Key.F7))
             {
                 EnableFullbright = !EnableFullbright;
                 ShowNotification($"Fullbright / Nightvision: {(EnableFullbright ? "ON" : "OFF")}");
             }
 
-            if (Input.GetKeyDown(KeyCode.F8))
+            if (IsKeyPressed(KeyCode.F8, Key.F8))
             {
                 EnableESP = !EnableESP;
                 ShowNotification($"X-Ray ESP: {(EnableESP ? "ON" : "OFF")}");
             }
 
-            // 3. Thực thi logic cheat theo từng frame
+            // 3. Quản lý con trỏ chuột khi Menu mở
+            if (isMenuVisible)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+
+            // 4. Thực thi logic cheat theo từng frame
             ApplyCheats();
 
-            // 4. Cập nhật cache ESP mỗi 0.6 giây
+            // 5. Cập nhật cache ESP mỗi 0.6 giây
             if (EnableESP)
             {
                 espCacheTimer += Time.deltaTime;
@@ -158,7 +195,7 @@ namespace RepoModMenu
                 }
             }
 
-            // 5. Quét danh sách vật phẩm nếu chưa có
+            // 6. Quét danh sách vật phẩm nếu chưa có
             itemScanTimer += Time.deltaTime;
             if (itemScanTimer > 2.0f)
             {
@@ -169,10 +206,20 @@ namespace RepoModMenu
                 }
             }
 
-            // 6. Giảm thời gian thông báo Toast
+            // 7. Giảm thời gian thông báo Toast
             if (notificationTimer > 0f)
             {
                 notificationTimer -= Time.deltaTime;
+            }
+        }
+
+        private void ToggleMenu()
+        {
+            isMenuVisible = !isMenuVisible;
+            if (isMenuVisible)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
             }
         }
 
@@ -480,31 +527,53 @@ namespace RepoModMenu
                 playerEspStyle.normal.textColor = Color.cyan;
                 playerEspStyle.alignment = TextAnchor.MiddleCenter;
             }
+
+            if (watermarkStyle == null)
+            {
+                watermarkStyle = new GUIStyle(GUI.skin.box);
+                watermarkStyle.fontSize = 11;
+                watermarkStyle.normal.textColor = Color.green;
+                watermarkStyle.alignment = TextAnchor.MiddleCenter;
+            }
         }
 
         private void OnGUI()
         {
+            // Luôn đặt độ sâu cao nhất để không bao giờ bị che khuất
+            GUI.depth = -1000;
             InitStyles();
 
-            // 1. Vẽ X-Ray ESP
+            // 1. WATERMARK & NÚT MỞ MENU TRỰC TIẾP TRÊN MÀN HÌNH
+            // Luôn hiển thị ở góc trên bên phải để người chơi biết chắc chắn mod đã chạy!
+            float wmWidth = 260f;
+            float wmHeight = 45f;
+            Rect wmRect = new Rect(Screen.width - wmWidth - 15, 10, wmWidth, wmHeight);
+
+            GUI.Box(wmRect, "★ REPO MASTER MOD v1.3.0 ★\n[Phím: Insert / F1 / ~ / Del]", watermarkStyle);
+            if (GUI.Button(new Rect(wmRect.x + 30, wmRect.y + wmHeight + 2, wmWidth - 60, 24), isMenuVisible ? "▲ Đóng Menu" : "▼ [MỞ MENU MOD]"))
+            {
+                ToggleMenu();
+            }
+
+            // 2. Vẽ X-Ray ESP
             if (EnableESP)
             {
                 DrawEspOverlay();
             }
 
-            // 2. Vẽ thông báo Toast nhỏ góc trên màn hình
+            // 3. Vẽ thông báo Toast nhỏ góc trên màn hình
             if (notificationTimer > 0f)
             {
                 var notifStyle = new GUIStyle(GUI.skin.box);
                 notifStyle.fontSize = 14;
                 notifStyle.normal.textColor = Color.yellow;
-                GUI.Box(new Rect(Screen.width / 2f - 180, 20, 360, 35), $"[MOD] {notificationText}", notifStyle);
+                GUI.Box(new Rect(Screen.width / 2f - 190, 20, 380, 35), $"[MOD] {notificationText}", notifStyle);
             }
 
-            // 3. Vẽ Menu chính
+            // 4. Vẽ Menu chính
             if (isMenuVisible)
             {
-                GUI.backgroundColor = new Color(0.12f, 0.12f, 0.14f, 0.95f);
+                GUI.backgroundColor = new Color(0.10f, 0.10f, 0.12f, 0.98f);
                 windowRect = GUI.Window(9999, windowRect, DrawWindowContent, $"★ R.E.P.O Master Menu v{ModVersion} ★");
             }
         }
@@ -625,7 +694,7 @@ namespace RepoModMenu
             }
 
             GUILayout.FlexibleSpace();
-            GUILayout.Box("Nhấn [Insert] hoặc [F1] để ẩn/hiện Menu", GUILayout.ExpandWidth(true));
+            GUILayout.Box("Nhấn [Insert], [F1], [~], [Del] hoặc Click nút góc màn hình để đóng Menu", GUILayout.ExpandWidth(true));
             GUILayout.EndVertical();
 
             // Kéo thả cửa sổ
@@ -894,7 +963,7 @@ namespace RepoModMenu
         private void DrawInfoTab()
         {
             GUILayout.Label("<b>DANH SÁCH PHÍM TẮT NHANH (HOTKEYS):</b>");
-            GUILayout.Label("• <b>Insert / F1</b>: Ẩn / Hiện Menu");
+            GUILayout.Label("• <b>Insert / F1 / ~ (Tilde) / Del</b>: Ẩn / Hiện Menu");
             GUILayout.Label("• <b>F2</b>: Bật / Tắt Speed Hack");
             GUILayout.Label("• <b>F3</b>: Bật / Tắt Vô hạn Double Jump");
             GUILayout.Label("• <b>F4</b>: Bật / Tắt Vô hạn Thể lực (Stamina)");
@@ -904,12 +973,9 @@ namespace RepoModMenu
             GUILayout.Label("• <b>F8</b>: Bật / Tắt X-Ray ESP (Nhìn xuyên tường)");
 
             GUILayout.Space(10);
-            GUILayout.Label("<b>KHI VÀO LOBBY CỦA NGƯỜI KHÁC (CLIENT):</b>");
-            GUILayout.Label("✔ Speed Hack, Air Jump, Stamina: Hoạt động 100%");
-            GUILayout.Label("✔ X-Ray ESP, Fullbright: Hoạt động 100%");
-            GUILayout.Label("✔ Super Grab (Tầm với xa, ném mạnh): Hoạt động 100%");
-            GUILayout.Label("✔ Upgrades (Wings, Stamina, Max HP): Hoạt động 100%");
-            GUILayout.Label("✔ Add đồ đi chợ vào Balo: Hoạt động 100%");
+            GUILayout.Label("<b>HỖ TRỢ MỞ MENU BẰNG CHUỘT:</b>");
+            GUILayout.Label("• Luôn có nút <b>[MỞ MENU MOD]</b> ở góc trên bên phải màn hình.");
+            GUILayout.Label("• Bạn có thể click chuột trực tiếp vào đó nếu bàn phím không có phím F!");
         }
 
         private void OnDestroy()
