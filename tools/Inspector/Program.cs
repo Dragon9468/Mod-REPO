@@ -17,7 +17,7 @@ class Program
             var typeDef = mr.GetTypeDefinition(handle);
             string typeName = mr.GetString(typeDef.Name);
 
-            if (typeName == "InputManager" || typeName == "InputKey")
+            if (typeName == "RoomFog" || typeName == "RoomAmbientLight" || typeName == "LightManager")
             {
                 Console.WriteLine($"\n=== {typeName} ===");
                 foreach (var fHandle in typeDef.GetFields())

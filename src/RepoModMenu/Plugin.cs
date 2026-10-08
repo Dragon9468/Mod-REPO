@@ -12,7 +12,7 @@ namespace RepoModMenu
     {
         public const string ModGUID = "com.phong.repocoolmenu";
         public const string ModName = "REPO Master Mod Menu";
-        public const string ModVersion = "1.3.0";
+        public const string ModVersion = "1.4.0";
 
         // Cached Reflection Fields
         private static readonly FieldInfo FieldJumpExtra = typeof(PlayerController).GetField("JumpExtra", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -34,7 +34,7 @@ namespace RepoModMenu
 
         // UI State
         private bool isMenuVisible = false;
-        private Rect windowRect = new Rect(60, 60, 520, 620);
+        private Rect windowRect = new Rect(60, 60, 520, 630);
         private int currentTab = 0;
         private readonly string[] tabNames = new string[] { "Movement", "Health", "Upgrades", "X-Ray ESP", "Balo Items", "Hotkeys" };
 
@@ -49,7 +49,19 @@ namespace RepoModMenu
         public static bool EnableNoTumble = false;
         public static bool EnableGodMode = false;
         public static bool EnableAntiGravity = false;
+
+        // Fullbright & Lighting (Sáng toàn bộ map)
         public static bool EnableFullbright = false;
+        public static float FullbrightIntensity = 2.0f;
+        public static bool DisableFog = true;
+        private GameObject mapDirectionalLightObj;
+        private Light mapDirectionalLight;
+        private bool origLightingSaved = false;
+        private Color origAmbientLight;
+        private UnityEngine.Rendering.AmbientMode origAmbientMode;
+        private float origAmbientIntensity;
+        private bool origFog;
+        private float origFogDensity;
 
         // Upgrades Modifiers
         public static float CustomGrabRange = 4f;
@@ -76,10 +88,6 @@ namespace RepoModMenu
         private string itemSearchQuery = "";
         private float itemScanTimer = 0f;
 
-        // Visual / Lighting
-        private GameObject fullbrightLightObj;
-        private Light fullbrightLight;
-
         // Notification toast
         private string notificationText = "";
         private float notificationTimer = 0f;
@@ -97,7 +105,6 @@ namespace RepoModMenu
 
         private bool IsKeyPressed(KeyCode legacyKey, Key newKey)
         {
-            // 1. Kiểm tra New Input System (Unity 2022 default)
             try
             {
                 if (Keyboard.current != null && Keyboard.current[newKey].wasPressedThisFrame)
@@ -107,7 +114,6 @@ namespace RepoModMenu
             }
             catch { }
 
-            // 2. Fallback qua Legacy Input
             try
             {
                 if (Input.GetKeyDown(legacyKey))
@@ -122,7 +128,7 @@ namespace RepoModMenu
 
         private void Update()
         {
-            // 1. Phím tắt Toggle Menu: [Insert], [F1], hoặc phím [~ / Backquote]
+            // 1. Phím tắt Toggle Menu
             if (IsKeyPressed(KeyCode.Insert, Key.Insert) ||
                 IsKeyPressed(KeyCode.F1, Key.F1) ||
                 IsKeyPressed(KeyCode.BackQuote, Key.Backquote) ||
@@ -165,7 +171,7 @@ namespace RepoModMenu
             if (IsKeyPressed(KeyCode.F7, Key.F7))
             {
                 EnableFullbright = !EnableFullbright;
-                ShowNotification($"Fullbright / Nightvision: {(EnableFullbright ? "ON" : "OFF")}");
+                ShowNotification($"Sáng toàn bộ Map (Fullbright): {(EnableFullbright ? "BẬT" : "TẮT")}");
             }
 
             if (IsKeyPressed(KeyCode.F8, Key.F8))
@@ -317,34 +323,69 @@ namespace RepoModMenu
                 }
             }
 
-            // --- Fullbright / Đèn sáng cá nhân ---
+            // --- SÁNG TOÀN BỘ MAP (MAP-WIDE FULLBRIGHT & NO FOG) ---
+            ApplyMapLighting();
+        }
+
+        private void ApplyMapLighting()
+        {
             if (EnableFullbright)
             {
-                if (fullbrightLightObj == null)
+                // Lưu cài đặt gốc lần đầu
+                if (!origLightingSaved)
                 {
-                    fullbrightLightObj = new GameObject("ModFullbrightLight");
-                    fullbrightLight = fullbrightLightObj.AddComponent<Light>();
-                    fullbrightLight.type = LightType.Point;
-                    fullbrightLight.range = 50f;
-                    fullbrightLight.intensity = 2f;
-                    fullbrightLight.color = Color.white;
+                    origAmbientLight = RenderSettings.ambientLight;
+                    origAmbientMode = RenderSettings.ambientMode;
+                    origAmbientIntensity = RenderSettings.ambientIntensity;
+                    origFog = RenderSettings.fog;
+                    origFogDensity = RenderSettings.fogDensity;
+                    origLightingSaved = true;
                 }
 
-                if (Camera.main != null)
+                // 1. Ánh sáng môi trường toàn cầu (chiếu sáng mọi căn phòng, mọi góc tối)
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+                RenderSettings.ambientLight = Color.white;
+                RenderSettings.ambientIntensity = FullbrightIntensity;
+
+                // 2. Xóa sương mù toàn map nếu bật
+                if (DisableFog)
                 {
-                    fullbrightLightObj.transform.position = Camera.main.transform.position;
+                    RenderSettings.fog = false;
+                    RenderSettings.fogDensity = 0f;
                 }
-                else
+
+                // 3. Nguồn sáng mặt trời Directional Light chiếu toàn cảnh map từ trên cao
+                if (mapDirectionalLightObj == null)
                 {
-                    fullbrightLightObj.transform.position = controller.transform.position + Vector3.up;
+                    mapDirectionalLightObj = new GameObject("ModMapDirectionalLight");
+                    mapDirectionalLight = mapDirectionalLightObj.AddComponent<Light>();
+                    mapDirectionalLight.type = LightType.Directional;
+                    mapDirectionalLight.color = Color.white;
+                    mapDirectionalLightObj.transform.rotation = Quaternion.Euler(60f, -40f, 0f);
+                    DontDestroyOnLoad(mapDirectionalLightObj);
                 }
-                fullbrightLight.enabled = true;
+
+                if (mapDirectionalLight != null)
+                {
+                    mapDirectionalLight.intensity = FullbrightIntensity;
+                    mapDirectionalLight.enabled = true;
+                }
             }
             else
             {
-                if (fullbrightLight != null)
+                // Tắt nguồn sáng nhân tạo và khôi phục cài đặt gốc
+                if (mapDirectionalLight != null)
                 {
-                    fullbrightLight.enabled = false;
+                    mapDirectionalLight.enabled = false;
+                }
+
+                if (origLightingSaved)
+                {
+                    RenderSettings.ambientLight = origAmbientLight;
+                    RenderSettings.ambientMode = origAmbientMode;
+                    RenderSettings.ambientIntensity = origAmbientIntensity;
+                    RenderSettings.fog = origFog;
+                    RenderSettings.fogDensity = origFogDensity;
                 }
             }
         }
@@ -539,17 +580,15 @@ namespace RepoModMenu
 
         private void OnGUI()
         {
-            // Luôn đặt độ sâu cao nhất để không bao giờ bị che khuất
             GUI.depth = -1000;
             InitStyles();
 
             // 1. WATERMARK & NÚT MỞ MENU TRỰC TIẾP TRÊN MÀN HÌNH
-            // Luôn hiển thị ở góc trên bên phải để người chơi biết chắc chắn mod đã chạy!
             float wmWidth = 260f;
             float wmHeight = 45f;
             Rect wmRect = new Rect(Screen.width - wmWidth - 15, 10, wmWidth, wmHeight);
 
-            GUI.Box(wmRect, "★ REPO MASTER MOD v1.3.0 ★\n[Phím: Insert / F1 / ~ / Del]", watermarkStyle);
+            GUI.Box(wmRect, "★ REPO MASTER MOD v1.4.0 ★\n[Phím: Insert / F1 / ~ / Del]", watermarkStyle);
             if (GUI.Button(new Rect(wmRect.x + 30, wmRect.y + wmHeight + 2, wmWidth - 60, 24), isMenuVisible ? "▲ Đóng Menu" : "▼ [MỞ MENU MOD]"))
             {
                 ToggleMenu();
@@ -744,8 +783,19 @@ namespace RepoModMenu
 
             EnableGodMode = GUILayout.Toggle(EnableGodMode, " [F5] Bất tử (God Mode)");
 
-            GUILayout.Space(5);
-            EnableFullbright = GUILayout.Toggle(EnableFullbright, " [F7] Đèn sáng toàn cảnh (Fullbright / Nightvision)");
+            GUILayout.Space(8);
+            GUILayout.Label("<b>HỆ THỐNG ÁNH SÁNG & SƯƠNG MÙ:</b>");
+            EnableFullbright = GUILayout.Toggle(EnableFullbright, " [F7] SÁNG TOÀN BỘ MAP (Fullbright / Map-wide Light)");
+            
+            if (EnableFullbright)
+            {
+                DisableFog = GUILayout.Toggle(DisableFog, " Xóa bỏ toàn bộ sương mù mờ tối (No Fog)");
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"Độ sáng toàn map: {FullbrightIntensity:F1}x", GUILayout.Width(150));
+                FullbrightIntensity = GUILayout.HorizontalSlider(FullbrightIntensity, 1.0f, 4.5f);
+                GUILayout.EndHorizontal();
+            }
 
             GUILayout.Space(10);
             GUILayout.Label("--- Thao tác tức thì ---");
@@ -969,7 +1019,7 @@ namespace RepoModMenu
             GUILayout.Label("• <b>F4</b>: Bật / Tắt Vô hạn Thể lực (Stamina)");
             GUILayout.Label("• <b>F5</b>: Bật / Tắt Bất tử (God Mode)");
             GUILayout.Label("• <b>F6</b>: Bật / Tắt Chống ngã (Anti-Tumble)");
-            GUILayout.Label("• <b>F7</b>: Bật / Tắt Sáng màn hình (Fullbright)");
+            GUILayout.Label("• <b>F7</b>: Bật / Tắt Sáng toàn bộ Map (Fullbright)");
             GUILayout.Label("• <b>F8</b>: Bật / Tắt X-Ray ESP (Nhìn xuyên tường)");
 
             GUILayout.Space(10);
@@ -980,9 +1030,9 @@ namespace RepoModMenu
 
         private void OnDestroy()
         {
-            if (fullbrightLightObj != null)
+            if (mapDirectionalLightObj != null)
             {
-                Destroy(fullbrightLightObj);
+                Destroy(mapDirectionalLightObj);
             }
         }
     }
