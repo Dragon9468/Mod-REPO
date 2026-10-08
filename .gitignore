@@ -1,0 +1,16 @@
+# Build Outputs
+bin/
+obj/
+*.user
+*.suo
+
+# Tools temporary dumps
+tools/Inspector/dump*.txt
+tools/Inspector/all_types.txt
+tools/Inspector/field_visibility.txt
+tools/Inspector/player_details.txt
+tools/Inspector/bin/
+tools/Inspector/obj/
+
+# Temporary zip files
+*.zip
