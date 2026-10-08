@@ -396,27 +396,23 @@ namespace RepoTrainerApp
             hotkeyTimer.Start();
         }
 
-        private async Task<string> SendTcpRequestAsync(string command, int timeoutMs = 800)
+        private async Task<string> SendTcpRequestAsync(string command, int timeoutMs = 1500)
         {
             using (var tcp = new TcpClient())
             {
-                var connectTask = tcp.ConnectAsync(IPAddress.Loopback, 29999);
-                var timeoutTask = Task.Delay(timeoutMs);
-                var completed = await Task.WhenAny(connectTask, timeoutTask);
-                if (completed == timeoutTask || !tcp.Connected)
+                using (var cts = new System.Threading.CancellationTokenSource(timeoutMs))
                 {
-                    throw new TimeoutException("Connection timed out");
-                }
-
-                using (var stream = tcp.GetStream())
-                using (var reader = new StreamReader(stream, Encoding.UTF8))
-                using (var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true })
-                {
-                    await writer.WriteLineAsync(command);
-                    var readTask = reader.ReadLineAsync();
-                    var readTimeout = await Task.WhenAny(readTask, Task.Delay(timeoutMs));
-                    if (readTimeout != readTask) throw new TimeoutException("Read timed out");
-                    return await readTask;
+                    await tcp.ConnectAsync(IPAddress.Loopback, 29999, cts.Token);
+                    using (var stream = tcp.GetStream())
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                    using (var writer = new StreamWriter(stream, Encoding.UTF8))
+                    {
+                        await writer.WriteLineAsync(command.AsMemory(), cts.Token);
+                        await writer.FlushAsync(cts.Token);
+                        string? line = await reader.ReadLineAsync(cts.Token);
+                        if (line == null) throw new IOException("Server closed connection");
+                        return line;
+                    }
                 }
             }
         }
@@ -427,7 +423,7 @@ namespace RepoTrainerApp
         {
             try
             {
-                var res = await SendTcpRequestAsync("STATUS", 600);
+                var res = await SendTcpRequestAsync("STATUS", 1200);
                 if (string.IsNullOrEmpty(res)) throw new Exception("Empty response");
 
                 lblStatus.Text = "🟢 ĐÃ KẾT NỐI VỚI GAME R.E.P.O (SẴN SÀNG CHEAT)";
@@ -479,7 +475,7 @@ namespace RepoTrainerApp
         {
             try
             {
-                var json = await SendTcpRequestAsync("ITEMS", 800);
+                var json = await SendTcpRequestAsync("ITEMS", 1200);
                 if (!string.IsNullOrEmpty(json) && json.Length > 2)
                 {
                     string inner = json.Trim('[', ']');
@@ -505,14 +501,14 @@ namespace RepoTrainerApp
             try
             {
                 string payload = string.IsNullOrEmpty(val) ? $"CMD {cmd}" : $"CMD {cmd} {val}";
-                await SendTcpRequestAsync(payload, 1000);
+                await SendTcpRequestAsync(payload, 2000);
                 System.Media.SystemSounds.Beep.Play();
             }
             catch { }
         }
 
         // Bắt phím tắt toàn cầu (kể cả khi đang trong game)
-        private bool f2Down, f3Down, f4Down, f5Down, f6Down, f7Down, f9Down, f10Down;
+        private bool f2Down, f3Down, f4Down, f5Down, f6Down, f7Down, f8Down, f9Down, f10Down;
 
         private async Task CheckGlobalHotkeys()
         {
@@ -526,8 +522,9 @@ namespace RepoTrainerApp
             if ((GetAsyncKeyState(0x74) & 0x8000) != 0) { if (!f5Down) { f5Down = true; await SendCommand("toggle_god"); } } else f5Down = false;
             // F6 = 0x75
             if ((GetAsyncKeyState(0x75) & 0x8000) != 0) { if (!f6Down) { f6Down = true; await SendCommand("toggle_tumble"); } } else f6Down = false;
-            // F7 = 0x76
+            // F7 = 0x76 & F8 = 0x77
             if ((GetAsyncKeyState(0x76) & 0x8000) != 0) { if (!f7Down) { f7Down = true; await SendCommand("toggle_fullbright"); } } else f7Down = false;
+            if ((GetAsyncKeyState(0x77) & 0x8000) != 0) { if (!f8Down) { f8Down = true; await SendCommand("toggle_fullbright"); } } else f8Down = false;
             // F9 = 0x78
             if ((GetAsyncKeyState(0x78) & 0x8000) != 0) { if (!f9Down) { f9Down = true; await SendCommand("heal"); } } else f9Down = false;
             // F10 = 0x79

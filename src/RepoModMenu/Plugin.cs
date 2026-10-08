@@ -79,16 +79,21 @@ namespace RepoModMenu
         private static volatile int cachedMaxHealth = 100;
         private static volatile string cachedItemsJson = "[]";
 
-        // IPC TCP Server (Pure WinSock socket, zero Mono bugs)
-        private TcpListener tcpListener;
-        private Thread tcpListenerThread;
-        private volatile bool isIpcRunning = false;
-        private readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
+        // IPC TCP Server (Pure WinSock socket, decoupled from scene GameObject)
+        private static TcpListener tcpListener;
+        private static Thread tcpListenerThread;
+        private static volatile bool isIpcRunning = false;
+        private static readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
 
         private void Awake()
         {
-            Logger.LogInfo($"{ModName} v{ModVersion} initializing IPC TCP server...");
-            StartTcpServer();
+            DontDestroyOnLoad(this.gameObject);
+            this.gameObject.hideFlags = HideFlags.HideAndDontSave;
+            Logger.LogInfo($"{ModName} v{ModVersion} initializing persistent IPC TCP server...");
+            if (!isIpcRunning)
+            {
+                StartTcpServer();
+            }
         }
 
         private void StartTcpServer()
@@ -115,27 +120,37 @@ namespace RepoModMenu
 
         private void TcpServerLoop()
         {
+            Logger.LogInfo("TcpServerLoop entered and listening on port 29999...");
             while (isIpcRunning && tcpListener != null)
             {
                 try
                 {
                     var client = tcpListener.AcceptTcpClient();
+                    Logger.LogInfo("New IPC client connected!");
                     ThreadPool.QueueUserWorkItem((state) => HandleTcpClient(client));
                 }
-                catch (SocketException) { break; }
+                catch (SocketException ex)
+                {
+                    Logger.LogWarning($"TcpServerLoop SocketException: {ex.Message}");
+                    if (!isIpcRunning) break;
+                    Thread.Sleep(300);
+                }
                 catch (Exception ex)
                 {
                     Logger.LogError($"TCP accept error: {ex.Message}");
+                    if (!isIpcRunning) break;
+                    Thread.Sleep(300);
                 }
             }
+            Logger.LogWarning("TcpServerLoop has exited!");
         }
 
         private void HandleTcpClient(TcpClient client)
         {
             using (client)
             {
-                client.ReceiveTimeout = 3000;
-                client.SendTimeout = 3000;
+                client.ReceiveTimeout = 4000;
+                client.SendTimeout = 4000;
                 try
                 {
                     using (var stream = client.GetStream())
@@ -166,16 +181,21 @@ namespace RepoModMenu
                                               $"Content-Length: {bodyBytes.Length}\r\n\r\n" +
                                               responseBody;
                             writer.Write(httpResp);
+                            writer.Flush();
                         }
                         else
                         {
                             // Raw TCP command: "STATUS", "CMD ...", "ITEMS"
                             responseBody = ProcessIpcRequest(line, false);
                             writer.WriteLine(responseBody);
+                            writer.Flush();
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"HandleTcpClient error: {ex.Message}");
+                }
             }
         }
 
@@ -680,8 +700,7 @@ namespace RepoModMenu
 
         private void OnDestroy()
         {
-            isIpcRunning = false;
-            try { tcpListener?.Stop(); } catch { }
+            Logger.LogWarning("Plugin GameObject OnDestroy called (IPC server remains active).");
             if (mapDirectionalLightObj != null) Destroy(mapDirectionalLightObj);
         }
     }
