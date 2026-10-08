@@ -14,3 +14,4 @@ tools/Inspector/obj/
 
 # Temporary zip files
 *.zip
+dist/trainer_publish/

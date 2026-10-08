@@ -45,12 +45,13 @@ namespace RepoTrainerApp
 
         private readonly List<string> allItemNames = new List<string>
         {
-            "ItemGunLaser", "ItemGunTranq", "ItemCartLaser",
-            "ItemDroneHeal", "ItemDroneBattery", "ItemDroneFeather", "ItemDroneTorque", "ItemDroneZeroGravity",
-            "ItemGrenadeExplosive", "ItemGrenadeStun", "ItemGrenadeShockwave", "ItemGrenadeHuman",
-            "ItemMineExplosive", "ItemMineStun",
-            "ItemStunBaton", "ItemMeleeInflatableHammer",
-            "ItemHealthPack", "ItemReviveItem", "ItemBattery", "ItemLeafBlower", "ItemRubberDuck", "ItemWalkieTalkie"
+            "Gun Laser", "Gun Tranq", "Cart Laser",
+            "Drone Heal", "Drone Battery", "Drone Feather", "Drone Torque", "Drone Zero Gravity",
+            "Grenade Explosive", "Grenade Stun", "Grenade Shockwave", "Grenade Human",
+            "Mine Explosive", "Mine Stun",
+            "Stun Baton", "Melee Inflatable Hammer",
+            "Health Pack", "Revive Item", "Battery", "Leaf Blower", "Rubber Duck", "Walkie Talkie",
+            "Zero Gravity Staff", "Vehicle Scooter"
         };
 
         public Form1()
@@ -226,7 +227,7 @@ namespace RepoTrainerApp
 
             btnHeal = new Button
             {
-                Text = "🩹 [F9] Hồi 100% Máu",
+                Text = "🩹 [F8] Hồi 100% Máu",
                 Location = new Point(15, 65),
                 Size = new Size(160, 32),
                 Font = itemFont,
@@ -238,7 +239,7 @@ namespace RepoTrainerApp
 
             btnRevive = new Button
             {
-                Text = "✨ Hồi sinh tức thì",
+                Text = "✨ [F9] Hồi sinh tức thì",
                 Location = new Point(185, 65),
                 Size = new Size(150, 32),
                 Font = itemFont,
@@ -522,12 +523,13 @@ namespace RepoTrainerApp
             if ((GetAsyncKeyState(0x74) & 0x8000) != 0) { if (!f5Down) { f5Down = true; await SendCommand("toggle_god"); } } else f5Down = false;
             // F6 = 0x75
             if ((GetAsyncKeyState(0x75) & 0x8000) != 0) { if (!f6Down) { f6Down = true; await SendCommand("toggle_tumble"); } } else f6Down = false;
-            // F7 = 0x76 & F8 = 0x77
+            // F7 = 0x76 (Fullbright)
             if ((GetAsyncKeyState(0x76) & 0x8000) != 0) { if (!f7Down) { f7Down = true; await SendCommand("toggle_fullbright"); } } else f7Down = false;
-            if ((GetAsyncKeyState(0x77) & 0x8000) != 0) { if (!f8Down) { f8Down = true; await SendCommand("toggle_fullbright"); } } else f8Down = false;
-            // F9 = 0x78
-            if ((GetAsyncKeyState(0x78) & 0x8000) != 0) { if (!f9Down) { f9Down = true; await SendCommand("heal"); } } else f9Down = false;
-            // F10 = 0x79
+            // F8 = 0x77 (Hồi 100% Máu)
+            if ((GetAsyncKeyState(0x77) & 0x8000) != 0) { if (!f8Down) { f8Down = true; await SendCommand("heal"); } } else f8Down = false;
+            // F9 = 0x78 (Hồi sinh tức thì)
+            if ((GetAsyncKeyState(0x78) & 0x8000) != 0) { if (!f9Down) { f9Down = true; await SendCommand("revive"); } } else f9Down = false;
+            // F10 = 0x79 (Max Nâng Cấp)
             if ((GetAsyncKeyState(0x79) & 0x8000) != 0) { if (!f10Down) { f10Down = true; await SendCommand("max_upgrades"); } } else f10Down = false;
         }
     }

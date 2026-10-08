@@ -342,16 +342,86 @@ namespace RepoModMenu
             }
         }
 
+        private string CleanItemKey(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace(" ", "").Replace("-", "").Replace("_", "").ToLowerInvariant();
+        }
+
         private void GiveItemByName(string name, bool toBalo)
         {
+            if (string.IsNullOrEmpty(name)) return;
+            if (cachedItems.Count == 0)
+            {
+                RefreshItemsList();
+            }
+
+            string cleanSearch = CleanItemKey(name);
             Item found = null;
+
             lock (cachedItems)
             {
-                found = cachedItems.Find(x => x.itemName.Equals(name, StringComparison.OrdinalIgnoreCase));
+                // 1. Tìm chính xác itemName hoặc name
+                found = cachedItems.Find(x => 
+                    (x.itemName != null && x.itemName.Equals(name, StringComparison.OrdinalIgnoreCase)) ||
+                    (x.name != null && x.name.Equals(name, StringComparison.OrdinalIgnoreCase)));
+
+                // 2. Tìm không phân biệt khoảng trắng/ký tự đặc biệt
+                if (found == null)
+                {
+                    found = cachedItems.Find(x =>
+                        CleanItemKey(x.itemName).Equals(cleanSearch) ||
+                        CleanItemKey(x.name).Equals(cleanSearch));
+                }
+
+                // 3. Tìm dạng Contains (từ khóa con)
+                if (found == null)
+                {
+                    found = cachedItems.Find(x =>
+                        (!string.IsNullOrEmpty(x.itemName) && CleanItemKey(x.itemName).Contains(cleanSearch)) ||
+                        (!string.IsNullOrEmpty(x.name) && CleanItemKey(x.name).Contains(cleanSearch)));
+                }
+
+                // 4. Nếu từ khóa bắt đầu hoặc không bắt đầu bằng "item", thử gỡ/thêm "item"
+                if (found == null)
+                {
+                    string noItem = cleanSearch.StartsWith("item") ? cleanSearch.Substring(4) : cleanSearch;
+                    found = cachedItems.Find(x =>
+                        CleanItemKey(x.itemName).Contains(noItem) ||
+                        CleanItemKey(x.name).Contains(noItem));
+                }
+            }
+
+            // 5. Nếu vẫn chưa thấy, tìm trực tiếp trong StatsManager.instance.itemDictionary
+            if (found == null && StatsManager.instance != null && StatsManager.instance.itemDictionary != null)
+            {
+                foreach (var kvp in StatsManager.instance.itemDictionary)
+                {
+                    var it = kvp.Value;
+                    if (it == null) continue;
+                    if (CleanItemKey(kvp.Key).Contains(cleanSearch) ||
+                        CleanItemKey(it.name).Contains(cleanSearch) ||
+                        CleanItemKey(it.itemName).Contains(cleanSearch))
+                    {
+                        found = it;
+                        break;
+                    }
+                }
+            }
+
+            // 6. Nếu vẫn chưa thấy, thử tải trực tiếp Resources.Load
+            if (found == null)
+            {
+                try
+                {
+                    found = Resources.Load<Item>($"Items/{name}") ?? Resources.Load<Item>(name);
+                }
+                catch { }
             }
 
             if (found != null)
             {
+                string disp = !string.IsNullOrEmpty(found.itemName) ? found.itemName : found.name;
                 AddItemToPlayerInventory(found, !toBalo);
             }
             else
@@ -582,46 +652,127 @@ namespace RepoModMenu
             lock (cachedItems)
             {
                 cachedItems.Clear();
-                var items = Resources.FindObjectsOfTypeAll<Item>();
-                if (items == null) return;
-
-                var added = new HashSet<string>();
+                var added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var names = new List<string>();
-                foreach (var it in items)
+
+                void AddItemCandidate(Item it)
                 {
-                    if (it != null && !string.IsNullOrEmpty(it.itemName) && !added.Contains(it.itemName))
+                    if (it == null) return;
+                    string displayName = !string.IsNullOrEmpty(it.itemName) ? it.itemName : it.name;
+                    if (string.IsNullOrEmpty(displayName)) return;
+                    if (displayName.StartsWith("Item Upgrade Player", StringComparison.OrdinalIgnoreCase) ||
+                        displayName.StartsWith("ItemUpgrade", StringComparison.OrdinalIgnoreCase))
+                        return;
+
+                    if (!added.Contains(displayName))
                     {
-                        if (it.itemName.StartsWith("ItemUpgrade", StringComparison.OrdinalIgnoreCase)) continue;
-                        added.Add(it.itemName);
+                        added.Add(displayName);
                         cachedItems.Add(it);
-                        names.Add(it.itemName);
+                        names.Add(displayName);
                     }
                 }
-                cachedItems.Sort((a, b) => string.Compare(a.itemName, b.itemName, StringComparison.OrdinalIgnoreCase));
+
+                // 1. Quét từ StatsManager.instance.itemDictionary
+                try
+                {
+                    if (StatsManager.instance != null && StatsManager.instance.itemDictionary != null)
+                    {
+                        foreach (var kvp in StatsManager.instance.itemDictionary)
+                        {
+                            AddItemCandidate(kvp.Value);
+                        }
+                    }
+                }
+                catch { }
+
+                // 2. Tải toàn bộ vật phẩm từ thư mục Resources/Items
+                try
+                {
+                    var loaded = Resources.LoadAll<Item>("Items");
+                    if (loaded != null)
+                    {
+                        foreach (var it in loaded)
+                        {
+                            AddItemCandidate(it);
+                        }
+                    }
+                }
+                catch { }
+
+                // 3. Fallback tìm trong Object bộ nhớ
+                try
+                {
+                    var inMem = Resources.FindObjectsOfTypeAll<Item>();
+                    if (inMem != null)
+                    {
+                        foreach (var it in inMem)
+                        {
+                            AddItemCandidate(it);
+                        }
+                    }
+                }
+                catch { }
+
+                cachedItems.Sort((a, b) =>
+                {
+                    string nameA = !string.IsNullOrEmpty(a.itemName) ? a.itemName : a.name;
+                    string nameB = !string.IsNullOrEmpty(b.itemName) ? b.itemName : b.name;
+                    return string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
+                });
                 names.Sort(StringComparer.OrdinalIgnoreCase);
                 cachedItemsJson = "[\"" + string.Join("\",\"", names.ToArray()) + "\"]";
+                Logger.LogInfo($"[RepoModMenu] Đã làm mới danh mục: {cachedItems.Count} vật phẩm sẵn sàng.");
             }
         }
 
         private GameObject GetPrefabFromItem(Item item)
         {
-            if (item == null || item.prefab == null) return null;
+            if (item == null) return null;
+            if (item.prefab != null)
+            {
+                try
+                {
+                    if (item.prefab.Prefab != null) return item.prefab.Prefab;
+                }
+                catch { }
+                try
+                {
+                    if (!string.IsNullOrEmpty(item.prefab.ResourcePath))
+                    {
+                        var loaded = Resources.Load<GameObject>(item.prefab.ResourcePath);
+                        if (loaded != null) return loaded;
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (!string.IsNullOrEmpty(item.prefab.PrefabName))
+                    {
+                        var loaded = Resources.Load<GameObject>(item.prefab.PrefabName);
+                        if (loaded != null) return loaded;
+                    }
+                }
+                catch { }
+            }
+
             try
             {
-                var prop = item.prefab.GetType().GetProperty("Prefab", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (prop != null) return prop.GetValue(item.prefab) as GameObject;
+                var loaded = Resources.Load<GameObject>($"Items/{item.name}") ?? Resources.Load<GameObject>(item.name);
+                if (loaded != null) return loaded;
             }
             catch { }
+
             return null;
         }
 
         private void AddItemToPlayerInventory(Item item, bool forceSpawnOnGround = false)
         {
             if (item == null) return;
+            string disp = !string.IsNullOrEmpty(item.itemName) ? item.itemName : item.name;
             GameObject prefabObj = GetPrefabFromItem(item);
             if (prefabObj == null)
             {
-                ShowNotification($"Vật phẩm [{item.itemName}] không tìm thấy Prefab!");
+                ShowNotification($"Vật phẩm [{disp}] không tìm thấy Prefab!");
                 return;
             }
 
@@ -633,11 +784,11 @@ namespace RepoModMenu
             }
 
             Vector3 spawnPos = controller.transform.position + controller.transform.forward * 1.2f + Vector3.up * 0.5f;
-            GameObject spawnedObj = Instantiate(prefabObj, spawnPos, Quaternion.identity);
+            GameObject spawnedObj = Instantiate(prefabObj, spawnPos, controller.transform.rotation);
 
             if (forceSpawnOnGround)
             {
-                ShowNotification($"Đã thả [{item.itemName}] ra trước mặt!");
+                ShowNotification($"Đã thả [{disp}] ra trước mặt!");
                 return;
             }
 
@@ -648,17 +799,17 @@ namespace RepoModMenu
                 if (freeIndex >= 0)
                 {
                     var spot = inv.GetSpotByIndex(freeIndex);
-                    var equippable = spawnedObj.GetComponent<ItemEquippable>();
+                    var equippable = spawnedObj.GetComponentInChildren<ItemEquippable>();
                     if (spot != null && equippable != null)
                     {
                         spot.EquipItem(equippable);
-                        ShowNotification($"Đã cất [{item.itemName}] vào Balo (Ô {freeIndex + 1})!");
+                        ShowNotification($"Đã cất [{disp}] vào Balo (Ô {freeIndex + 1})!");
                         return;
                     }
                 }
             }
 
-            ShowNotification($"Balo đầy! Đã thả [{item.itemName}] ra trước mặt.");
+            ShowNotification($"Balo đầy! Đã thả [{disp}] ra trước mặt.");
         }
 
         private PlayerHealth GetLocalPlayerHealth(PlayerController controller)
