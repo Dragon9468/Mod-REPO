@@ -8,4 +8,5 @@ if (-not (Test-Path $gameDir)) {
 
 Write-Host "Installing mod to: $gameDir ..." -ForegroundColor Cyan
 Copy-Item -Path "$distDir\*" -Destination $gameDir -Recurse -Force
-Write-Host "Done! Mod installed successfully. Press Insert or F1 in-game to open menu." -ForegroundColor Green
+Write-Host "Done! Mod and External Trainer installed successfully." -ForegroundColor Green
+Write-Host "Launch REPO game, then launch RepoTrainerApp.exe (External Wand-style Trainer)." -ForegroundColor Cyan

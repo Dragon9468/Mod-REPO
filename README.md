@@ -1,90 +1,94 @@
-# R.E.P.O. - Portable Standalone Mod Menu & Trainer
+# R.E.P.O. - Portable Standalone Mod & External Trainer (Wand-Style)
 
-Bản mod menu dạng rời rạc (Standalone & Portable) dành cho game **R.E.P.O.** (Steam).
-Được thiết kế độc lập, không phụ thuộc vào phần mềm bên thứ ba như WeMod, không bị giới hạn thời gian chơi.
-
----
-
-## 🌟 Điểm nổi bật (Features)
-
-1. **Kiến trúc Mod rời rạc (Portable):**
-   - Không can thiệp, không sửa đổi hay ghi đè file gốc của game.
-   - Khi chuyển sang máy mới: Chỉ cần tải/copy thư mục `dist/REPO_Portable_Mod` và dán vào thư mục cài đặt game là chơi được ngay.
-2. **Giao diện Menu trực quan (In-game IMGUI):**
-   - Bấm **`Insert`** hoặc **`F1`** để ẩn/hiện menu ngay trong game.
-   - Cửa sổ phân chia các Tab rõ ràng, có thanh trượt điều chỉnh, có thể kéo thả tự do.
-3. **Phím tắt nhanh (Hotkeys) trong trận:**
-   - Kích hoạt tức thì bằng một phím bấm khi đang chạy trốn quái vật, có thông báo nhỏ (Toast) trên màn hình.
-4. **Hệ thống X-Ray ESP (Nhìn xuyên tường):**
-   - Định vị quái vật (màu Đỏ), vật phẩm & tiền quý (màu Vàng) và đồng đội (màu Xanh) kèm khoảng cách chính xác theo thời gian thực.
-5. **Hệ thống Nâng cấp nhân vật (Perks & Grabber):**
-   - 1-Click Max tất cả nâng cấp: +150 HP, +5 Extra Jumps, x2 Thể lực, Tầm với tay cầm đồ siêu xa (15m), nhấc đồ nặng như lông hồng, ném đồ cực mạnh, mở khóa Đôi Cánh (Tumble Wings) rơi không ngã.
-6. **Kho Vật Phẩm Đi Chợ (Shop Items Spawner vào Balo):**
-   - Tự do lấy bất kỳ món đồ nào trong Shop (Súng Laser, Súng Tranq, Drone Hồi máu, Drone Pin, Lựu đạn nổ, Lựu đạn Stun, Búa tạ Melee, Mìn nổ, Bình máu, v.v.).
-   - Nút **`[+ Balo]`**: Tự động đưa thẳng vào ô trống trong balo của bạn để bấm phím số dùng ngay!
-   - Nút **`[Thả đất]`**: Spawn ra đất ngay trước mặt để nhặt hoặc cho đồng đội nhặt.
+Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standalone & Portable) dành cho game **R.E.P.O.** (Steam).
+Được thiết kế giao diện ứng dụng ngoài Desktop giống hệt **Wand / WeMod**, không giới hạn thời gian chơi, không cần tài khoản, hoàn toàn miễn phí và mã nguồn mở.
 
 ---
 
-## ⌨️ Danh sách phím tắt (Hotkeys)
+## 🌟 Điểm nổi bật & Cải tiến v2.0 (New Architecture)
+
+1. **Ứng dụng Trainer ngoài độc lập (`RepoTrainerApp.exe`):**
+   - Không bị giới hạn bởi engine Unity New Input System hay lỗi đè phím trong game.
+   - Giao diện Dark-Mode hiện đại, hiển thị trạng thái kết nối trực tiếp với game: `🟢 ĐÃ KẾT NỐI VỚI GAME R.E.P.O` và lượng Máu (HP) theo thời gian thực.
+   - Tính năng **"📌 Ghim trên cùng"** (Always On Top) giúp bạn vừa chơi game vừa thấy và chỉnh tính năng cheat dễ dàng.
+   - **Phím tắt toàn cầu (Global Hotkeys F2 - F10):** Dùng trực tiếp Windows API `GetAsyncKeyState`, bạn có thể bấm phím tắt ngay cả khi đang tập trung chơi game ở chế độ Fullscreen!
+
+2. **Sáng toàn bộ bản đồ (Map-wide Fullbright & No Fog):**
+   - Loại bỏ hoàn toàn bóng tối và sương mù trên toàn map (không chỉ là soi sáng xung quanh bản thân).
+   - Biến toàn bộ map thành ban ngày, nhìn rõ mọi ngóc ngách, quái vật và đồ vật từ xa.
+
+3. **Kho Đồ Đi Chợ (Shop Items Spawner):**
+   - Tự do lấy mọi vật phẩm: Súng Laser, Súng Tranq, Drone Hồi Máu, Drone Pin, Lựu đạn nổ, Lựu đạn Stun, Búa tạ Melee, v.v.
+   - Nút **`🎒 [+ CẤT VÀO BALO]`**: Đưa thẳng vào ô trống trong balo để bấm phím số dùng ngay lập tức.
+   - Nút **`📦 Thả ra đất trước mặt`**: Spawn trực tiếp dưới đất cho bạn hoặc đồng đội nhặt.
+
+4. **Max All Upgrades (1-Click):**
+   - Tăng máu tối đa lên 250 HP, hồi đầy máu, nhảy 5 lần liên tiếp trên không, nhân đôi thể lực, mở khóa Đôi Cánh (Tumble Wings), tay hút đồ 15m siêu mạnh.
+
+5. **Client-side 100% trong phòng Multiplayer (Chơi chung bạn bè):**
+   - Speed Hack tùy chỉnh độ nhanh (1.0x - 6.0x).
+   - Vô hạn Double Jump / Bay nhảy trên không.
+   - Vô hạn Thể lực (Infinite Stamina).
+   - Chống té ngã / lộn nhào (Anti-Tumble).
+   - Bất tử (God Mode).
+
+---
+
+## ⌨️ Bảng phím tắt toàn cầu (Global Hotkeys)
+
+Phím tắt hoạt động cả khi đang ở trong cửa sổ game hoặc ngoài Desktop:
 
 | Phím tắt | Tính năng | Mô tả |
 | :--- | :--- | :--- |
-| **Insert** hoặc **F1** | **Ẩn / Hiện Menu** | Bật tắt cửa sổ Mod Menu chính |
-| **F2** | **Speed Hack** | Tăng tốc độ chạy (điều chỉnh từ 1.0x đến 6.0x) |
+| **F2** | **Speed Hack** | Bật / Tắt tăng tốc độ di chuyển (thanh trượt từ 1.0x đến 6.0x) |
 | **F3** | **Infinite Double Jump** | Vô hạn nhảy trên không (air jump liên tục như bay) |
-| **F4** | **Infinite Stamina** | Vô hạn thể lực / năng lượng, chạy không bao giờ mệt |
-| **F5** | **God Mode** | Bất tử, không bị trừ máu khi bị quái cắn |
-| **F6** | **Anti-Tumble / No Fall** | Chống ngã / trượt chân / lộn nhào khi va chạm mạnh |
-| **F7** | **Fullbright / Nightvision** | Tạo nguồn sáng cá nhân tỏa rộng xung quanh |
-| **F8** | **X-Ray ESP** | Bật / Tắt nhìn xuyên tường thấy Quái, Đồ và Bạn bè |
+| **F4** | **Infinite Stamina** | Vô hạn thể lực, chạy không bao giờ mệt |
+| **F5** | **God Mode** | Bất tử, không bị quái cắn mất máu |
+| **F6** | **Anti-Tumble** | Chống ngã / trượt chân / lộn nhào khi va chạm mạnh |
+| **F7** | **Fullbright & No Fog** | **SÁNG TOÀN BỘ BẢN ĐỒ** & Xóa tan sương mù |
+| **F9** | **Instant Heal** | Hồi phục 100% Máu ngay tức khắc |
+| **F10** | **MAX ALL UPGRADES** | Max toàn bộ chỉ số nâng cấp (HP, Nhảy, Đôi cánh, Hút đồ) |
 
 ---
 
-## 🛡️ Hoạt động khi là Client vào phòng người khác (Multiplayer)
+## 📁 Cấu trúc thư mục Mod rời rạc (Portable)
 
-* **Hoạt động 100%:**
-  - Speed Hack (Chạy siêu nhanh)
-  - Infinite Double Jump (Bay nhảy trên không)
-  - Infinite Stamina (Thể lực vô tận)
-  - X-Ray ESP (Nhìn xuyên tường quái vật, vật phẩm và đồng đội)
-  - Fullbright (Đèn sáng cá nhân)
-  - Chống ngã (Anti-Tumble)
-  - Siêu tay cầm đồ (Tầm với xa, lực nhấc khỏe, ném xa)
-  - Đôi Cánh (Tumble Wings)
-  - Add đồ đi chợ vào Balo (Súng, Drone, Nade, Melee dùng bình thường)
-
----
-
-## 📁 Cấu trúc thư mục Mod rời rạc
-
-Toàn bộ gói mod chạy độc lập nằm trong thư mục:
+Toàn bộ gói mod và ứng dụng trainer nằm trong thư mục:
 ```text
 dist/REPO_Portable_Mod/
+├── RepoTrainerApp.exe        <-- Ứng dụng ngoài (External Trainer) giống Wand
 ├── BepInEx/
-│   ├── core/                      <-- Framework BepInEx 5.4.21
+│   ├── core/
 │   ├── plugins/
 │   │   └── RepoModMenu/
-│   │       └── RepoModMenu.dll    <-- File Mod chính do chúng ta tự viết
+│   │       └── RepoModMenu.dll  <-- Plugin kết nối IPC cục bộ v2.0
 │   └── config/
 ├── doorstop_config.ini
 └── winhttp.dll
 ```
 
-### Cách mang sang máy mới:
-1. Tải thư mục `dist/REPO_Portable_Mod`.
-2. Copy toàn bộ các file bên trong (`BepInEx`, `winhttp.dll`, `doorstop_config.ini`) dán vào thư mục cài đặt game R.E.P.O trên máy mới (nơi chứa file `REPO.exe`).
-3. Khởi động game và trải nghiệm!
+---
+
+## 🚀 Hướng dẫn sử dụng (Rất đơn giản)
+
+### Lần đầu cài đặt hoặc mang sang máy mới:
+1. Copy toàn bộ các file trong `dist/REPO_Portable_Mod/` vào thư mục cài game R.E.P.O (nơi có file `REPO.exe`).
+   *(Hoặc nếu ở trên máy hiện tại, chỉ cần chạy file `install_to_game.ps1`)*.
+2. Mở game **R.E.P.O.**.
+3. Chạy file **`RepoTrainerApp.exe`** (có thể ghim ra Desktop hoặc mở trực tiếp).
+   - Đèn trạng thái trên ứng dụng sẽ chuyển sang: **`🟢 ĐÃ KẾT NỐI VỚI GAME R.E.P.O`**.
+4. Vào trận và bấm trực tiếp các nút trên ứng dụng Trainer hoặc bấm phím tắt **F2, F3, F4, F5, F6, F7, F9, F10** bất cứ lúc nào!
 
 ---
 
-## 🛠️ Cách tự chỉnh sửa & Build lại (Dành cho Dev)
+## 🛠️ Dành cho Developer (Tự build lại)
 
-### Lệnh Build:
+### 1. Build Mod DLL (BepInEx Plugin):
 ```powershell
-dotnet build src/RepoModMenu/RepoModMenu.csproj -c Release
+& "C:\Program Files\dotnet\dotnet.exe" build src/RepoModMenu/RepoModMenu.csproj -c Release
 ```
-Sau đó chạy script tự động cài đặt vào game:
+
+### 2. Build Trainer App (External Executable):
 ```powershell
-powershell -ExecutionPolicy Bypass -File install_to_game.ps1
+& "C:\Program Files\dotnet\dotnet.exe" publish src/RepoTrainerApp/RepoTrainerApp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/REPO_Portable_Mod
 ```
