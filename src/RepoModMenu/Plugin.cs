@@ -11,7 +11,7 @@ namespace RepoModMenu
     {
         public const string ModGUID = "com.phong.repocoolmenu";
         public const string ModName = "REPO Master Mod Menu";
-        public const string ModVersion = "1.1.0";
+        public const string ModVersion = "1.2.0";
 
         // Cached Reflection Fields
         private static readonly FieldInfo FieldJumpExtra = typeof(PlayerController).GetField("JumpExtra", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -33,9 +33,9 @@ namespace RepoModMenu
 
         // UI State
         private bool isMenuVisible = false;
-        private Rect windowRect = new Rect(40, 40, 430, 540);
+        private Rect windowRect = new Rect(40, 40, 500, 600);
         private int currentTab = 0;
-        private readonly string[] tabNames = new string[] { "Movement", "Health", "Upgrades", "X-Ray ESP", "Hotkeys" };
+        private readonly string[] tabNames = new string[] { "Movement", "Health", "Upgrades", "X-Ray ESP", "Balo Items", "Hotkeys" };
 
         // Cheats & Settings
         public static bool EnableSpeedHack = false;
@@ -68,6 +68,12 @@ namespace RepoModMenu
         private readonly List<EnemyParent> cachedEnemies = new List<EnemyParent>();
         private readonly List<ValuableObject> cachedValuables = new List<ValuableObject>();
         private readonly List<PlayerAvatar> cachedPlayers = new List<PlayerAvatar>();
+
+        // Items Database Cache
+        private readonly List<Item> cachedItems = new List<Item>();
+        private Vector2 itemScrollPos = Vector2.zero;
+        private string itemSearchQuery = "";
+        private float itemScanTimer = 0f;
 
         // Visual / Lighting
         private GameObject fullbrightLightObj;
@@ -152,7 +158,18 @@ namespace RepoModMenu
                 }
             }
 
-            // 5. Giảm thời gian thông báo Toast
+            // 5. Quét danh sách vật phẩm nếu chưa có
+            itemScanTimer += Time.deltaTime;
+            if (itemScanTimer > 2.0f)
+            {
+                itemScanTimer = 0f;
+                if (cachedItems.Count == 0)
+                {
+                    RefreshItemsList();
+                }
+            }
+
+            // 6. Giảm thời gian thông báo Toast
             if (notificationTimer > 0f)
             {
                 notificationTimer -= Time.deltaTime;
@@ -327,6 +344,90 @@ namespace RepoModMenu
             }
         }
 
+        private void RefreshItemsList()
+        {
+            cachedItems.Clear();
+            var items = Resources.FindObjectsOfTypeAll<Item>();
+            if (items == null) return;
+
+            var added = new HashSet<string>();
+            foreach (var it in items)
+            {
+                if (it != null && !string.IsNullOrEmpty(it.itemName) && !added.Contains(it.itemName))
+                {
+                    if (it.itemName.StartsWith("ItemUpgrade", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    added.Add(it.itemName);
+                    cachedItems.Add(it);
+                }
+            }
+
+            cachedItems.Sort((a, b) => string.Compare(a.itemName, b.itemName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private GameObject GetPrefabFromItem(Item item)
+        {
+            if (item == null || item.prefab == null) return null;
+            try
+            {
+                var prop = item.prefab.GetType().GetProperty("Prefab", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (prop != null)
+                {
+                    return prop.GetValue(item.prefab) as GameObject;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private void AddItemToPlayerInventory(Item item, bool forceSpawnOnGround = false)
+        {
+            if (item == null) return;
+
+            GameObject prefabObj = GetPrefabFromItem(item);
+            if (prefabObj == null)
+            {
+                ShowNotification($"Vật phẩm [{item.itemName}] không tìm thấy Prefab 3D!");
+                return;
+            }
+
+            var controller = PlayerController.instance;
+            if (controller == null)
+            {
+                ShowNotification("Chưa vào trận hoặc không tìm thấy Player!");
+                return;
+            }
+
+            Vector3 spawnPos = controller.transform.position + controller.transform.forward * 1.2f + Vector3.up * 0.5f;
+            GameObject spawnedObj = Instantiate(prefabObj, spawnPos, Quaternion.identity);
+
+            if (forceSpawnOnGround)
+            {
+                ShowNotification($"Đã thả [{item.itemName}] ra trước mặt!");
+                return;
+            }
+
+            // Cất vào Balo nếu còn ô trống
+            var inv = Inventory.instance;
+            if (inv != null)
+            {
+                int freeIndex = inv.GetFirstFreeInventorySpotIndex();
+                if (freeIndex >= 0)
+                {
+                    var spot = inv.GetSpotByIndex(freeIndex);
+                    var equippable = spawnedObj.GetComponent<ItemEquippable>();
+                    if (spot != null && equippable != null)
+                    {
+                        spot.EquipItem(equippable);
+                        ShowNotification($"Đã cất [{item.itemName}] vào Balo (Ô {freeIndex + 1})!");
+                        return;
+                    }
+                }
+            }
+
+            ShowNotification($"Balo đã đầy! Đã thả [{item.itemName}] ra đất trước mặt.");
+        }
+
         private PlayerHealth GetLocalPlayerHealth(PlayerController controller)
         {
             if (controller.playerAvatarScript != null && controller.playerAvatarScript.playerHealth != null)
@@ -397,7 +498,7 @@ namespace RepoModMenu
                 var notifStyle = new GUIStyle(GUI.skin.box);
                 notifStyle.fontSize = 14;
                 notifStyle.normal.textColor = Color.yellow;
-                GUI.Box(new Rect(Screen.width / 2f - 170, 20, 340, 35), $"[MOD] {notificationText}", notifStyle);
+                GUI.Box(new Rect(Screen.width / 2f - 180, 20, 360, 35), $"[MOD] {notificationText}", notifStyle);
             }
 
             // 3. Vẽ Menu chính
@@ -516,6 +617,9 @@ namespace RepoModMenu
                     DrawEspTab();
                     break;
                 case 4:
+                    DrawItemsTab();
+                    break;
+                case 5:
                     DrawInfoTab();
                     break;
             }
@@ -629,19 +733,15 @@ namespace RepoModMenu
             {
                 if (controller != null)
                 {
-                    // Tăng máu tối đa
                     if (health != null)
                     {
                         FieldMaxHealth?.SetValue(health, 250);
                         FieldHealth?.SetValue(health, 250);
                     }
-                    // Tăng số lần nhảy hợp lệ
                     FieldJumpExtra?.SetValue(controller, 5);
-                    // Tăng thể lực gốc
                     controller.EnergyStart = 200f;
                     controller.EnergyCurrent = 200f;
 
-                    // Bật cánh bay và leo trèo khi ngã
                     if (avatar != null)
                     {
                         FieldTumbleWings?.SetValue(avatar, true);
@@ -649,7 +749,6 @@ namespace RepoModMenu
                         FieldCrouchRest?.SetValue(avatar, true);
                     }
 
-                    // Tăng sức mạnh tay cầm đồ
                     CustomGrabRange = 15f;
                     CustomGrabStrength = 5f;
                     CustomThrowStrength = 3.5f;
@@ -724,6 +823,74 @@ namespace RepoModMenu
             GUILayout.Label($"<i>Đang hiển thị: {cachedEnemies.Count} quái, {cachedValuables.Count} đồ, {cachedPlayers.Count} bạn</i>");
         }
 
+        private void DrawItemsTab()
+        {
+            GUILayout.Label("<b>KHO VẬT PHẨM ĐI CHỢ (SHOP ITEMS):</b>");
+
+            // Nút Refresh danh sách
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("🔄 Quét lại kho đồ", GUILayout.Width(140)))
+            {
+                RefreshItemsList();
+                ShowNotification($"Đã nạp {cachedItems.Count} vật phẩm từ game!");
+            }
+
+            GUILayout.Label("Tìm: ", GUILayout.Width(35));
+            itemSearchQuery = GUILayout.TextField(itemSearchQuery);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(5);
+            if (cachedItems.Count == 0)
+            {
+                GUILayout.Label("<i>(Đang nạp dữ liệu vật phẩm... Hãy bấm 'Quét lại kho đồ' nếu chưa hiện)</i>");
+            }
+            else
+            {
+                GUILayout.Label($"Tìm thấy: <b>{cachedItems.Count}</b> vật phẩm sẵn sàng!");
+            }
+
+            GUILayout.Space(5);
+
+            // Bắt đầu danh sách cuộn
+            itemScrollPos = GUILayout.BeginScrollView(itemScrollPos, GUILayout.Height(330));
+            foreach (var item in cachedItems)
+            {
+                if (item == null) continue;
+
+                // Lọc tìm kiếm
+                if (!string.IsNullOrEmpty(itemSearchQuery) && !item.itemName.ToLower().Contains(itemSearchQuery.ToLower()))
+                {
+                    continue;
+                }
+
+                GUILayout.BeginHorizontal(GUI.skin.box);
+                
+                string iconText = "📦";
+                string lower = item.itemName.ToLower();
+                if (lower.Contains("gun") || lower.Contains("laser") || lower.Contains("tranq")) iconText = "🔫";
+                else if (lower.Contains("drone")) iconText = "🛸";
+                else if (lower.Contains("grenade") || lower.Contains("mine") || lower.Contains("shockwave")) iconText = "💣";
+                else if (lower.Contains("melee") || lower.Contains("hammer") || lower.Contains("baton")) iconText = "🔨";
+                else if (lower.Contains("health") || lower.Contains("revive")) iconText = "💊";
+                else if (lower.Contains("duck")) iconText = "🦆";
+
+                GUILayout.Label($"{iconText} <b>{item.itemName}</b>", GUILayout.Width(230));
+
+                if (GUILayout.Button("+ Balo", GUILayout.Width(85)))
+                {
+                    AddItemToPlayerInventory(item, false);
+                }
+
+                if (GUILayout.Button("Thả đất", GUILayout.Width(75)))
+                {
+                    AddItemToPlayerInventory(item, true);
+                }
+
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.EndScrollView();
+        }
+
         private void DrawInfoTab()
         {
             GUILayout.Label("<b>DANH SÁCH PHÍM TẮT NHANH (HOTKEYS):</b>");
@@ -742,6 +909,7 @@ namespace RepoModMenu
             GUILayout.Label("✔ X-Ray ESP, Fullbright: Hoạt động 100%");
             GUILayout.Label("✔ Super Grab (Tầm với xa, ném mạnh): Hoạt động 100%");
             GUILayout.Label("✔ Upgrades (Wings, Stamina, Max HP): Hoạt động 100%");
+            GUILayout.Label("✔ Add đồ đi chợ vào Balo: Hoạt động 100%");
         }
 
         private void OnDestroy()

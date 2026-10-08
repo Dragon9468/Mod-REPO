@@ -17,18 +17,18 @@ class Program
             var typeDef = mr.GetTypeDefinition(handle);
             string typeName = mr.GetString(typeDef.Name);
 
-            if (typeName == "ValuableObject" || typeName == "PlayerAvatar")
+            if (typeName.StartsWith("PrefabRef", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"\n=== {typeName} ===");
                 foreach (var fHandle in typeDef.GetFields())
                 {
                     var f = mr.GetFieldDefinition(fHandle);
-                    string name = mr.GetString(f.Name);
-                    var attrs = f.Attributes;
-                    if (name == "dollarValueCurrent" || name == "playerName" || name == "isLocal")
-                    {
-                        Console.WriteLine($"Field: {attrs} -> {name}");
-                    }
+                    Console.WriteLine($"Field: {mr.GetString(f.Name)}");
+                }
+                foreach (var mHandle in typeDef.GetMethods())
+                {
+                    var m = mr.GetMethodDefinition(mHandle);
+                    Console.WriteLine($"Method: {mr.GetString(m.Name)}");
                 }
             }
         }

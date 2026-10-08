@@ -19,6 +19,10 @@ Bản mod menu dạng rời rạc (Standalone & Portable) dành cho game **R.E.P
    - Định vị quái vật (màu Đỏ), vật phẩm & tiền quý (màu Vàng) và đồng đội (màu Xanh) kèm khoảng cách chính xác theo thời gian thực.
 5. **Hệ thống Nâng cấp nhân vật (Perks & Grabber):**
    - 1-Click Max tất cả nâng cấp: +150 HP, +5 Extra Jumps, x2 Thể lực, Tầm với tay cầm đồ siêu xa (15m), nhấc đồ nặng như lông hồng, ném đồ cực mạnh, mở khóa Đôi Cánh (Tumble Wings) rơi không ngã.
+6. **Kho Vật Phẩm Đi Chợ (Shop Items Spawner vào Balo):**
+   - Tự do lấy bất kỳ món đồ nào trong Shop (Súng Laser, Súng Tranq, Drone Hồi máu, Drone Pin, Lựu đạn nổ, Lựu đạn Stun, Búa tạ Melee, Mìn nổ, Bình máu, v.v.).
+   - Nút **`[+ Balo]`**: Tự động đưa thẳng vào ô trống trong balo của bạn để bấm phím số dùng ngay!
+   - Nút **`[Thả đất]`**: Spawn ra đất ngay trước mặt để nhặt hoặc cho đồng đội nhặt.
 
 ---
 
@@ -48,7 +52,7 @@ Bản mod menu dạng rời rạc (Standalone & Portable) dành cho game **R.E.P
   - Chống ngã (Anti-Tumble)
   - Siêu tay cầm đồ (Tầm với xa, lực nhấc khỏe, ném xa)
   - Đôi Cánh (Tumble Wings)
-* **Lưu ý:** Vì game xử lý chuyển động và đồ họa ở máy bạn (Client-Authoritative), các tính năng trên hoạt động mượt mà trong bất kỳ phòng nào mà không lo bị chặn bởi Host.
+  - Add đồ đi chợ vào Balo (Súng, Drone, Nade, Melee dùng bình thường)
 
 ---
 
