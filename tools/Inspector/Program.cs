@@ -10,14 +10,17 @@ class Program
     {
         string managedDir = @"D:\New folder\steam\steamapps\common\REPO\REPO_Data\Managed";
         var asmDef = AssemblyDefinition.ReadAssembly(Path.Combine(managedDir, "Assembly-CSharp.dll"));
-        var caType = asmDef.MainModule.GetType("CameraAim");
-        
-        var pc = asmDef.MainModule.GetType("PlayerController");
-        var caAwake = caType.Methods.FirstOrDefault(m => m.Name == "Awake");
-        if (caAwake != null)
+        var ep = asmDef.MainModule.GetType("EnemyParent");
+        var esType = asmDef.MainModule.GetType("EnemyState");
+        if (esType != null)
         {
-            Console.WriteLine("\n=== CameraAim Awake IL Instructions ===");
-            foreach (var inst in caAwake.Body.Instructions) Console.WriteLine($"  {inst.OpCode} {inst.Operand}");
+            Console.WriteLine("\n=== EnemyState Enum Values ===");
+            foreach (var f in esType.Fields)
+            {
+                if (f.IsStatic) Console.WriteLine($"  EnemyState: {f.Name} = {f.Constant}");
+            }
         }
+
+        return;
     }
 }

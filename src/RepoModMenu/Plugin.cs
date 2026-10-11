@@ -52,14 +52,22 @@ namespace RepoModMenu
         private static readonly MethodInfo MethodCsStartCharge = typeof(ChargingStation).GetMethod("StartCharge", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         private static readonly FieldInfo FieldEpEnemyName = typeof(EnemyParent).GetField("enemyName", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldEpEnemyNameLocalized = typeof(EnemyParent).GetField("enemyNameLocalized", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldEpSpawned = typeof(EnemyParent).GetField("Spawned", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldEpEnemy = typeof(EnemyParent).GetField("Enemy", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldEpEnableObject = typeof(EnemyParent).GetField("EnableObject", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldEpDespawnedTimer = typeof(EnemyParent).GetField("DespawnedTimer", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly FieldInfo FieldEnemyParent = typeof(Enemy).GetField("EnemyParent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldEnemyCenterTransform = typeof(Enemy).GetField("CenterTransform", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldEnemyKillLookAtTransform = typeof(Enemy).GetField("KillLookAtTransform", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldEnemyHealth = typeof(Enemy).GetField("Health", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         private static readonly FieldInfo FieldEhDead = typeof(EnemyHealth).GetField("dead", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldEhHealthCurrent = typeof(EnemyHealth).GetField("healthCurrent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldEhHealth = typeof(EnemyHealth).GetField("health", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly MethodInfo MethodLocGetLocalizedString = typeof(LocalizedAsset).GetMethod("GetLocalizedString", Type.EmptyTypes);
 
         private static readonly FieldInfo FieldVoDollarValueCurrent = typeof(ValuableObject).GetField("dollarValueCurrent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldVoRb = typeof(ValuableObject).GetField("rb", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -100,6 +108,7 @@ namespace RepoModMenu
             public string Name;
             public string ExtraInfo;
             public int Type; // 0: Enemy, 1: Valuable, 2: Teammate
+            public EnemyHealth EnemyHealth;
         }
 
         public static bool EnableEsp = false;
@@ -1321,12 +1330,9 @@ namespace RepoModMenu
                     if (score < bestScore)
                     {
                         bestScore = score;
-                        bestTarget = ep.transform;
+                        bestTarget = centerT ?? ep.transform;
                         targetDist = dist;
-
-                        string ename = FieldEpEnemyName != null ? (string)FieldEpEnemyName.GetValue(ep) : "";
-                        if (string.IsNullOrEmpty(ename)) ename = ep.gameObject.name.Replace("(Clone)", "");
-                        targetName = ename;
+                        targetName = GetEnemyName(ep, enemyObj);
 
                         if (weaponType == HeldWeaponType.Grenade)
                         {
@@ -1675,6 +1681,136 @@ namespace RepoModMenu
             ShowNotification($"Balo đầy! Đã thả [{disp}] ra trước mặt.");
         }
 
+        private static string GetEnemyName(EnemyParent ep, Enemy enemy)
+        {
+            // 1. Thử lấy từ enemyNameLocalized (LocalizedAsset)
+            if (ep != null && FieldEpEnemyNameLocalized != null)
+            {
+                try
+                {
+                    var loc = FieldEpEnemyNameLocalized.GetValue(ep);
+                    if (loc != null && MethodLocGetLocalizedString != null)
+                    {
+                        string s = MethodLocGetLocalizedString.Invoke(loc, null) as string;
+                        if (!string.IsNullOrEmpty(s) && !s.Trim().Equals("Enemy", StringComparison.OrdinalIgnoreCase) && !s.Trim().Equals("EnemyParent", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return s.Trim();
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Thử lấy từ field enemyName của EnemyParent
+            if (ep != null && FieldEpEnemyName != null)
+            {
+                try
+                {
+                    string s = FieldEpEnemyName.GetValue(ep) as string;
+                    if (!string.IsNullOrEmpty(s) && !s.Trim().Equals("Enemy", StringComparison.OrdinalIgnoreCase) && !s.Trim().Equals("EnemyParent", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return s.Trim();
+                    }
+                }
+                catch { }
+            }
+
+            // 3. Quét các Component đặc thù của quái (EnemySlowWalker, EnemyFloater, ...)
+            GameObject targetObj = enemy != null ? enemy.gameObject : (ep != null ? ep.gameObject : null);
+            if (targetObj != null)
+            {
+                try
+                {
+                    var monoBehaviors = targetObj.GetComponentsInChildren<MonoBehaviour>(true);
+                    if (monoBehaviors != null)
+                    {
+                        foreach (var mb in monoBehaviors)
+                        {
+                            if (mb == null) continue;
+                            string cName = mb.GetType().Name;
+                            if (cName.StartsWith("Enemy") && 
+                                !cName.Equals("Enemy") && 
+                                !cName.Equals("EnemyParent") && 
+                                !cName.Equals("EnemyHealth") && 
+                                !cName.Equals("EnemyRigidbody") && 
+                                !cName.Equals("EnemyNavMeshAgent") && 
+                                !cName.Equals("EnemyVision") && 
+                                !cName.Equals("EnemyGrounded") && 
+                                !cName.Equals("EnemyJump") && 
+                                !cName.EndsWith("Anim") &&
+                                !cName.EndsWith("Attack") &&
+                                !cName.EndsWith("State") &&
+                                !cName.StartsWith("EnemyState") &&
+                                !cName.Contains("Director") &&
+                                !cName.Contains("Visual") &&
+                                !cName.Contains("Particle"))
+                            {
+                                string baseName = cName.Substring(5); // Cắt bỏ "Enemy"
+                                if (!string.IsNullOrEmpty(baseName))
+                                {
+                                    return FormatCamelCase(baseName);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                // 4. Lấy từ tên GameObject của Enemy (hoặc EnemyParent)
+                string cleanedName = CleanEnemyGameObjectName(targetObj.name);
+                if (!string.IsNullOrEmpty(cleanedName) && !cleanedName.Equals("Enemy", StringComparison.OrdinalIgnoreCase) && !cleanedName.Equals("EnemyParent", StringComparison.OrdinalIgnoreCase) && !cleanedName.Equals("Quái vật", StringComparison.OrdinalIgnoreCase))
+                {
+                    return cleanedName;
+                }
+            }
+
+            if (ep != null && ep.gameObject != null)
+            {
+                string cleanedEp = CleanEnemyGameObjectName(ep.gameObject.name);
+                if (!string.IsNullOrEmpty(cleanedEp) && !cleanedEp.Equals("Enemy", StringComparison.OrdinalIgnoreCase) && !cleanedEp.Equals("EnemyParent", StringComparison.OrdinalIgnoreCase) && !cleanedEp.Equals("Quái vật", StringComparison.OrdinalIgnoreCase))
+                {
+                    return cleanedEp;
+                }
+            }
+
+            return "Quái vật";
+        }
+
+        private static string CleanEnemyGameObjectName(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return "";
+            string s = raw.Replace("(Clone)", "").Replace("Prefab", "").Replace("_", " ").Trim();
+
+            if (s.StartsWith("Enemy ", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(6).Trim();
+            else if (s.StartsWith("Enemy", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(5).Trim();
+
+            if (s.EndsWith(" Enemy", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(0, s.Length - 6).Trim();
+
+            if (s.Equals("Parent", StringComparison.OrdinalIgnoreCase) || s.Equals("EnemyParent", StringComparison.OrdinalIgnoreCase))
+                return "";
+
+            return FormatCamelCase(s);
+        }
+
+        private static string FormatCamelCase(string str)
+        {
+            if (string.IsNullOrEmpty(str)) return "";
+            var sb = new StringBuilder();
+            for (int i = 0; i < str.Length; i++)
+            {
+                char c = str[i];
+                if (i > 0 && char.IsUpper(c) && !char.IsUpper(str[i - 1]) && str[i - 1] != ' ')
+                {
+                    sb.Append(' ');
+                }
+                sb.Append(c);
+            }
+            return sb.ToString().Trim();
+        }
+
         private void UpdateEspTargets()
         {
             if (!EnableEsp) return;
@@ -1683,47 +1819,160 @@ namespace RepoModMenu
 
             try
             {
-                // 1. Quét Quái vật (Enemies)
+                // 1. Quét Quái vật (Enemies) - CHỈ quét quái thực sự còn sống và đã spawn, loại bỏ hoàn toàn khung ảo / vật thể không phải quái
+                var processedEnemies = new HashSet<Enemy>();
+
                 var enemies = FindObjectsOfType<EnemyParent>();
-                var addedEnemyTransforms = new HashSet<Transform>();
                 if (enemies != null)
                 {
                     foreach (var ep in enemies)
                     {
-                        if (ep == null || ep.transform == null) continue;
-                        bool spawned = FieldEpSpawned != null ? (bool)FieldEpSpawned.GetValue(ep) : true;
-                        if (!spawned) continue;
+                        if (ep == null) continue;
 
-                        string ename = FieldEpEnemyName != null ? (string)FieldEpEnemyName.GetValue(ep) : "";
-                        if (string.IsNullOrEmpty(ename)) ename = ep.gameObject.name.Replace("(Clone)", "");
+                        // Bỏ qua nếu chưa spawn
+                        if (FieldEpSpawned != null && !(bool)FieldEpSpawned.GetValue(ep)) continue;
 
-                        addedEnemyTransforms.Add(ep.transform);
+                        // Bỏ qua nếu đang trong trạng thái despawn
+                        if (FieldEpDespawnedTimer != null && (float)FieldEpDespawnedTimer.GetValue(ep) > 0f) continue;
+
+                        // Bỏ qua nếu EnableObject bị tắt
+                        if (FieldEpEnableObject != null)
+                        {
+                            var enableObj = FieldEpEnableObject.GetValue(ep) as GameObject;
+                            if (enableObj != null && !enableObj.activeSelf) continue;
+                        }
+
+                        Enemy enemy = null;
+                        if (FieldEpEnemy != null)
+                        {
+                            enemy = FieldEpEnemy.GetValue(ep) as Enemy;
+                        }
+                        if (enemy == null)
+                        {
+                            enemy = ep.GetComponentInChildren<Enemy>();
+                        }
+
+                        if (enemy == null) continue;
+                        if (processedEnemies.Contains(enemy)) continue;
+                        processedEnemies.Add(enemy);
+
+                        // Bỏ qua nếu enemy đang ở trạng thái Despawn
+                        if (enemy.CurrentState == EnemyState.Despawn) continue;
+
+                        // Lấy thông tin máu & kiểm tra còn sống không
+                        EnemyHealth eh = null;
+                        if (FieldEnemyHealth != null)
+                        {
+                            eh = FieldEnemyHealth.GetValue(enemy) as EnemyHealth;
+                        }
+                        if (eh == null)
+                        {
+                            eh = enemy.GetComponentInChildren<EnemyHealth>() ?? ep.GetComponentInChildren<EnemyHealth>();
+                        }
+
+                        int curHp = 0;
+                        if (eh != null)
+                        {
+                            if (FieldEhDead != null && (bool)FieldEhDead.GetValue(eh)) continue;
+                            if (FieldEhHealthCurrent != null)
+                            {
+                                curHp = (int)FieldEhHealthCurrent.GetValue(eh);
+                                if (curHp <= 0) continue;
+                            }
+                        }
+
+                        // TỌA ĐỘ THEO DÕI TUYỆT ĐỐI CỦA QUÁI:
+                        // Sử dụng CenterTransform (trọng tâm cơ thể quái đang di chuyển) để bám theo 100% thời gian thực
+                        Transform trackingT = null;
+                        if (FieldEnemyCenterTransform != null)
+                        {
+                            trackingT = FieldEnemyCenterTransform.GetValue(enemy) as Transform;
+                        }
+                        if (trackingT == null)
+                        {
+                            trackingT = enemy.transform;
+                        }
+
+                        string eName = GetEnemyName(ep, enemy);
+                        string extra = curHp > 0 ? $"{curHp} HP" : "";
+
                         newEntries.Add(new EspEntry
                         {
-                            Transform = ep.transform,
-                            Name = ename,
-                            Type = 0
+                            Transform = trackingT,
+                            Name = eName,
+                            ExtraInfo = extra,
+                            Type = 0,
+                            EnemyHealth = eh
                         });
                     }
                 }
 
-                var eHealths = FindObjectsOfType<EnemyHealth>();
-                if (eHealths != null)
+                // Quét bổ sung các Enemy độc lập (nếu có trường hợp quái không qua EnemyParent)
+                var standaloneEnemies = FindObjectsOfType<Enemy>();
+                if (standaloneEnemies != null)
                 {
-                    foreach (var eh in eHealths)
+                    foreach (var enemy in standaloneEnemies)
                     {
-                        if (eh == null || eh.transform == null) continue;
-                        bool dead = FieldEhDead != null ? (bool)FieldEhDead.GetValue(eh) : false;
-                        if (dead) continue;
-                        if (addedEnemyTransforms.Contains(eh.transform)) continue;
+                        if (enemy == null || processedEnemies.Contains(enemy)) continue;
+                        processedEnemies.Add(enemy);
 
-                        int hp = FieldEhHealthCurrent != null ? (int)FieldEhHealthCurrent.GetValue(eh) : 0;
+                        EnemyParent ep = null;
+                        if (FieldEnemyParent != null)
+                        {
+                            ep = FieldEnemyParent.GetValue(enemy) as EnemyParent;
+                        }
+                        if (ep == null)
+                        {
+                            ep = enemy.GetComponentInParent<EnemyParent>();
+                        }
+
+                        if (ep != null)
+                        {
+                            if (FieldEpSpawned != null && !(bool)FieldEpSpawned.GetValue(ep)) continue;
+                            if (FieldEpDespawnedTimer != null && (float)FieldEpDespawnedTimer.GetValue(ep) > 0f) continue;
+                            if (FieldEpEnableObject != null)
+                            {
+                                var eo = FieldEpEnableObject.GetValue(ep) as GameObject;
+                                if (eo != null && !eo.activeSelf) continue;
+                            }
+                        }
+
+                        if (enemy.CurrentState == EnemyState.Despawn) continue;
+
+                        EnemyHealth eh = FieldEnemyHealth != null ? FieldEnemyHealth.GetValue(enemy) as EnemyHealth : null;
+                        if (eh == null) eh = enemy.GetComponentInChildren<EnemyHealth>();
+
+                        int curHp = 0;
+                        if (eh != null)
+                        {
+                            if (FieldEhDead != null && (bool)FieldEhDead.GetValue(eh)) continue;
+                            if (FieldEhHealthCurrent != null)
+                            {
+                                curHp = (int)FieldEhHealthCurrent.GetValue(eh);
+                                if (curHp <= 0) continue;
+                            }
+                        }
+
+                        Transform trackingT = null;
+                        if (FieldEnemyCenterTransform != null)
+                        {
+                            trackingT = FieldEnemyCenterTransform.GetValue(enemy) as Transform;
+                        }
+                        if (trackingT == null)
+                        {
+                            trackingT = enemy.transform;
+                        }
+
+                        string eName = GetEnemyName(ep, enemy);
+                        string extra = curHp > 0 ? $"{curHp} HP" : "";
+
                         newEntries.Add(new EspEntry
                         {
-                            Transform = eh.transform,
-                            Name = eh.gameObject.name.Replace("(Clone)", ""),
-                            ExtraInfo = hp > 0 ? $"{hp} HP" : "",
-                            Type = 0
+                            Transform = trackingT,
+                            Name = eName,
+                            ExtraInfo = extra,
+                            Type = 0,
+                            EnemyHealth = eh
                         });
                     }
                 }
@@ -1854,7 +2103,7 @@ namespace RepoModMenu
                 float dist = Vector3.Distance(camPos, targetPos);
 
                 // Thu khoảng cách thấy lại để tránh rối mắt
-                if (entry.Type == 0 && dist > 40f) continue;  // Quái: 40m
+                if (entry.Type == 0 && dist > 55f) continue;  // Quái: 55m
                 if (entry.Type == 1 && dist > 28f) continue;  // Đồ đạc: 28m
                 if (entry.Type == 2 && dist > 60f) continue;  // Đồng đội: 60m
 
@@ -1872,6 +2121,15 @@ namespace RepoModMenu
                 switch (entry.Type)
                 {
                     case 0:
+                        if (entry.EnemyHealth != null)
+                        {
+                            bool isDead = FieldEhDead != null ? (bool)FieldEhDead.GetValue(entry.EnemyHealth) : false;
+                            if (isDead) continue;
+                            int curHp = FieldEhHealthCurrent != null ? (int)FieldEhHealthCurrent.GetValue(entry.EnemyHealth) : 0;
+                            if (curHp <= 0) continue;
+                            entry.ExtraInfo = $"{curHp} HP";
+                        }
+
                         label = string.IsNullOrEmpty(entry.ExtraInfo)
                             ? $"[👹 {entry.Name}] ({dist:0}m)"
                             : $"[👹 {entry.Name} - {entry.ExtraInfo}] ({dist:0}m)";
