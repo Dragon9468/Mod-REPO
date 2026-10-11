@@ -38,16 +38,21 @@ Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standal
 
 Phím tắt hoạt động cả khi đang ở trong cửa sổ game hoặc ngoài Desktop:
 
-| Phím tắt | Tính năng | Mô tả |
+| Phím tắt | Tính năng | Mô tả chi tiết |
 | :--- | :--- | :--- |
+| **F1** | **Noclip (Bay Xuyên Tường)** | Bay tự do xuyên qua mọi bức tường, sàn nhà (WASD + Space/Ctrl + Shift tăng tốc) |
 | **F2** | **Speed Hack** | Bật / Tắt tăng tốc độ di chuyển (thanh trượt từ 1.0x đến 6.0x) |
-| **F3** | **Infinite Double Jump** | Vô hạn nhảy trên không (air jump liên tục như bay) |
-| **F4** | **Infinite Stamina** | Vô hạn thể lực, chạy không bao giờ mệt |
-| **F5** | **God Mode** | Bất tử, không bị quái cắn mất máu |
-| **F6** | **Anti-Tumble** | Chống ngã / trượt chân / lộn nhào khi va chạm mạnh |
-| **F7** | **Fullbright & No Fog** | **SÁNG TOÀN BỘ BẢN ĐỒ** & Xóa tan sương mù |
+| **F3** | **Infinite Jump** | Vô hạn nhảy trên không (air jump liên tục) |
+| **F4** | **Infinite Stamina** | Vô hạn thể lực, chạy liên tục không mệt |
+| **F5** | **Anti-Tumble** | Chống ngã té / lộn nhào / choáng khi va đập mạnh |
+| **F6** | **God Mode** | Bất tử tuyệt đối, không nhận sát thương từ quái hay bẫy |
+| **F7** | **Fullbright & No Fog** | **SÁNG TOÀN BỘ BẢN ĐỒ** & Xóa tan sương mù dày đặc |
+| **F8** | **ESP Nhìn Xuyên Tường** | Quái vật (Đỏ tươi), Đồ đạc ($ + kg màu vàng thu gọn), Đồng đội (Trắng) |
 | **F9** | **Instant Heal** | Hồi phục 100% Máu ngay tức khắc |
-| **F10** | **MAX ALL UPGRADES** | Max toàn bộ chỉ số nâng cấp (HP, Nhảy, Đôi cánh, Hút đồ) |
+| **F10** | **Instant Revive** | Hồi sinh đồng đội hoặc bản thân lập tức khi gục ngã |
+| **F11** | **MAX ALL UPGRADES** | Max toàn bộ chỉ số nhân vật (250 HP, Nhảy 5 lần, Đôi cánh, Hút đồ 15m) |
+| **F12** | **Sạc Đầy Xe Truck** | Bơm đầy 100% Pin năng lượng cho Trạm Sạc / Xe Truck |
+| **Z** | **🎯 Aimbot Khóa Mục Tiêu** | Tự động bắt mục tiêu: **Súng** (khóa đầu/yếu điểm), **Cận chiến** (tự quay người trúng 100%), **Lựu đạn/Ném** (tự căn góc cầu vồng bù trọng lực). Giữ **Chuột Phải** hoặc phím **V** để khóa! |
 
 ---
 

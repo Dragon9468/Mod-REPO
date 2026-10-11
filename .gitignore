@@ -3,6 +3,7 @@ bin/
 obj/
 *.user
 *.suo
+*.pdb
 
 # Tools temporary dumps
 tools/Inspector/dump*.txt
@@ -15,3 +16,4 @@ tools/Inspector/obj/
 # Temporary zip files
 *.zip
 dist/trainer_publish/
+dist/RepoTrainerApp/

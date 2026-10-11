@@ -21,21 +21,27 @@ namespace RepoTrainerApp
         private CheckBox chkAlwaysOnTop;
         private Label lblHealth;
 
+        private CheckBox chkNoclip;
         private CheckBox chkSpeed;
         private TrackBar tbSpeed;
         private Label lblSpeedVal;
 
         private CheckBox chkJump;
         private CheckBox chkStamina;
-        private CheckBox chkGod;
         private CheckBox chkTumble;
+        private CheckBox chkGod;
         private CheckBox chkFullbright;
+        private CheckBox chkEsp;
+        private CheckBox chkAimbot;
 
         private Button btnHeal;
         private Button btnRevive;
         private Button btnMaxUpgrades;
+        private Button btnChargeTruck;
+        private CheckBox chkTruckEnergy;
 
         private TextBox txtSearchItem;
+        private ComboBox cboCategory;
         private ListBox lbItems;
         private Button btnGiveBalo;
         private Button btnGiveGround;
@@ -43,15 +49,127 @@ namespace RepoTrainerApp
         private System.Windows.Forms.Timer pollTimer;
         private System.Windows.Forms.Timer hotkeyTimer;
 
-        private readonly List<string> allItemNames = new List<string>
+        public class ItemEntry
         {
-            "Gun Laser", "Gun Tranq", "Cart Laser",
-            "Drone Heal", "Drone Battery", "Drone Feather", "Drone Torque", "Drone Zero Gravity",
-            "Grenade Explosive", "Grenade Stun", "Grenade Shockwave", "Grenade Human",
-            "Mine Explosive", "Mine Stun",
-            "Stun Baton", "Melee Inflatable Hammer",
-            "Health Pack", "Revive Item", "Battery", "Leaf Blower", "Rubber Duck", "Walkie Talkie",
-            "Zero Gravity Staff", "Vehicle Scooter"
+            public string Category { get; set; } = "";
+            public string Tag { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string CleanKey => Name.Replace(" ", "").Replace("-", "").Replace("_", "").ToLowerInvariant();
+            public override string ToString() => $"{Tag} {Name}";
+        }
+
+        public static int GetCategoryOrder(string cat)
+        {
+            switch (cat)
+            {
+                case "Súng": return 1;
+                case "Cận chiến": return 2;
+                case "Cháy nổ": return 3;
+                case "Drone": return 4;
+                case "Orb": return 5;
+                case "Xe": return 6;
+                case "Nâng cấp": return 7;
+                case "Năng lượng": return 8;
+                case "Y tế": return 9;
+                case "Công cụ": return 10;
+                default: return 99;
+            }
+        }
+
+        private readonly List<ItemEntry> itemsCatalog = new List<ItemEntry>
+        {
+            // 🔫 1. Súng & Vũ khí (Guns)
+            new ItemEntry { Category = "Súng", Tag = "[Súng]", Name = "Gun Handgun" },
+            new ItemEntry { Category = "Súng", Tag = "[Súng]", Name = "Gun Laser" },
+            new ItemEntry { Category = "Súng", Tag = "[Súng]", Name = "Gun Shockwave" },
+            new ItemEntry { Category = "Súng", Tag = "[Súng]", Name = "Gun Shotgun" },
+            new ItemEntry { Category = "Súng", Tag = "[Súng]", Name = "Gun Stun" },
+            new ItemEntry { Category = "Súng", Tag = "[Súng]", Name = "Gun Tranq" },
+            new ItemEntry { Category = "Súng", Tag = "[Súng]", Name = "Laser Cannon" },
+
+            // ⚔️ 2. Cận chiến & Vũ khí đập (Melee)
+            new ItemEntry { Category = "Cận chiến", Tag = "[Cận chiến]", Name = "Melee Baseball Bat" },
+            new ItemEntry { Category = "Cận chiến", Tag = "[Cận chiến]", Name = "Melee Frying Pan" },
+            new ItemEntry { Category = "Cận chiến", Tag = "[Cận chiến]", Name = "Melee Inflatable Hammer" },
+            new ItemEntry { Category = "Cận chiến", Tag = "[Cận chiến]", Name = "Melee Sledgehammer" },
+            new ItemEntry { Category = "Cận chiến", Tag = "[Cận chiến]", Name = "Melee Stun Baton" },
+            new ItemEntry { Category = "Cận chiến", Tag = "[Cận chiến]", Name = "Melee Sword" },
+
+            // 💣 3. Cháy nổ & Bom mìn (Explosives & Mines)
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Grenade Duct Taped" },
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Grenade Explosive" },
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Grenade Human" },
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Grenade Shockwave" },
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Grenade Stun" },
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Mine Explosive" },
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Mine Shockwave" },
+            new ItemEntry { Category = "Cháy nổ", Tag = "[Cháy nổ]", Name = "Mine Stun" },
+
+            // 🤖 4. Drones Hỗ Trợ (Drones)
+            new ItemEntry { Category = "Drone", Tag = "[Drone]", Name = "Drone Battery" },
+            new ItemEntry { Category = "Drone", Tag = "[Drone]", Name = "Drone Feather" },
+            new ItemEntry { Category = "Drone", Tag = "[Drone]", Name = "Drone Heal" },
+            new ItemEntry { Category = "Drone", Tag = "[Drone]", Name = "Drone Indestructible" },
+            new ItemEntry { Category = "Drone", Tag = "[Drone]", Name = "Drone Torque" },
+            new ItemEntry { Category = "Drone", Tag = "[Drone]", Name = "Drone Zero Gravity" },
+
+            // 🔮 5. Orbs Năng Lượng (Orbs)
+            new ItemEntry { Category = "Orb", Tag = "[Orb]", Name = "Orb Battery" },
+            new ItemEntry { Category = "Orb", Tag = "[Orb]", Name = "Orb Feather" },
+            new ItemEntry { Category = "Orb", Tag = "[Orb]", Name = "Orb Heal" },
+            new ItemEntry { Category = "Orb", Tag = "[Orb]", Name = "Orb Indestructible" },
+            new ItemEntry { Category = "Orb", Tag = "[Orb]", Name = "Orb Magnet" },
+            new ItemEntry { Category = "Orb", Tag = "[Orb]", Name = "Orb Torque" },
+            new ItemEntry { Category = "Orb", Tag = "[Orb]", Name = "Orb Zero Gravity" },
+
+            // 🛒 6. Xe Đẩy & Phương Tiện (Carts & Vehicles)
+            new ItemEntry { Category = "Xe", Tag = "[Xe]", Name = "Cart Cannon" },
+            new ItemEntry { Category = "Xe", Tag = "[Xe]", Name = "Cart Laser" },
+            new ItemEntry { Category = "Xe", Tag = "[Xe]", Name = "Cart Medium" },
+            new ItemEntry { Category = "Xe", Tag = "[Xe]", Name = "Cart Small" },
+            new ItemEntry { Category = "Xe", Tag = "[Xe]", Name = "Vehicle Scooter" },
+            new ItemEntry { Category = "Xe", Tag = "[Xe]", Name = "Vehicle Semiscooter" },
+            new ItemEntry { Category = "Xe", Tag = "[Xe]", Name = "Vehicle Semiscooter Small" },
+
+            // ⭐ 7. Hộp Nâng Cấp Nhân Vật (Player Upgrades)
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Crouch Rest" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Energy" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Extra Jump" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Grab Range" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Grab Strength" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Grab Throw" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Health" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Sprint Speed" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Tumble Climb" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Tumble Launch" },
+            new ItemEntry { Category = "Nâng cấp", Tag = "[Nâng cấp]", Name = "Upgrade Player Tumble Wings" },
+
+            // 🔋 8. Pin & Năng Lượng (Energy)
+            new ItemEntry { Category = "Năng lượng", Tag = "[Năng lượng]", Name = "Battery" },
+            new ItemEntry { Category = "Năng lượng", Tag = "[Năng lượng]", Name = "Power Crystal" },
+
+            // 🩹 9. Y tế & Hồi Sinh (Medical)
+            new ItemEntry { Category = "Y tế", Tag = "[Y tế]", Name = "Defibro" },
+            new ItemEntry { Category = "Y tế", Tag = "[Y tế]", Name = "Health Pack Large" },
+            new ItemEntry { Category = "Y tế", Tag = "[Y tế]", Name = "Health Pack Medium" },
+            new ItemEntry { Category = "Y tế", Tag = "[Y tế]", Name = "Health Pack Small" },
+            new ItemEntry { Category = "Y tế", Tag = "[Y tế]", Name = "Revive Item" },
+
+            // 🛠️ 10. Công Cụ & Tiện Ích (Tools)
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Duck Bucket" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Extendable Ladder" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Extraction Tracker" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Hidey Box" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Leaf Blower" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Magic Staff" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Phase Bridge" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Roll Staff" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Rubber Duck" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Torque Staff" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Valuable Tracker" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Void Staff" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Walkie Talkie" },
+            new ItemEntry { Category = "Công cụ", Tag = "[Công cụ]", Name = "Zero Gravity Staff" }
         };
 
         public Form1()
@@ -62,8 +180,8 @@ namespace RepoTrainerApp
 
         private void InitializeComponent()
         {
-            this.Text = "★ R.E.P.O. Master External Trainer v2.0 ★";
-            this.Size = new Size(580, 720);
+            this.Text = "★ R.E.P.O. Master External Trainer v2.1 ★";
+            this.Size = new Size(590, 805);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.BackColor = Color.FromArgb(24, 25, 29);
             this.ForeColor = Color.White;
@@ -114,7 +232,7 @@ namespace RepoTrainerApp
             {
                 Text = " 🏃 DI CHUYỂN (MOVEMENT) ",
                 Location = new Point(15, currentY),
-                Size = new Size(535, 130),
+                Size = new Size(545, 130),
                 ForeColor = Color.SkyBlue,
                 Font = titleFont
             };
@@ -143,7 +261,7 @@ namespace RepoTrainerApp
             tbSpeed = new TrackBar
             {
                 Location = new Point(230, 25),
-                Size = new Size(290, 45),
+                Size = new Size(300, 45),
                 Minimum = 10,
                 Maximum = 60,
                 Value = 25,
@@ -157,11 +275,22 @@ namespace RepoTrainerApp
             };
             gbMovement.Controls.Add(tbSpeed);
 
+            chkNoclip = new CheckBox
+            {
+                Text = "[F1] Bay Xuyên Tường (Noclip)",
+                Location = new Point(15, 62),
+                Size = new Size(245, 25),
+                Font = itemFont,
+                ForeColor = Color.Cyan
+            };
+            chkNoclip.Click += async (s, e) => await SendCommand("toggle_noclip");
+            gbMovement.Controls.Add(chkNoclip);
+
             chkJump = new CheckBox
             {
                 Text = "[F3] Vô hạn Double Jump / Bay nhảy",
-                Location = new Point(15, 62),
-                Size = new Size(250, 25),
+                Location = new Point(275, 62),
+                Size = new Size(255, 25),
                 Font = itemFont,
                 ForeColor = Color.White
             };
@@ -171,8 +300,8 @@ namespace RepoTrainerApp
             chkStamina = new CheckBox
             {
                 Text = "[F4] Vô hạn Thể lực (Stamina)",
-                Location = new Point(280, 62),
-                Size = new Size(240, 25),
+                Location = new Point(15, 95),
+                Size = new Size(245, 25),
                 Font = itemFont,
                 ForeColor = Color.White
             };
@@ -181,9 +310,9 @@ namespace RepoTrainerApp
 
             chkTumble = new CheckBox
             {
-                Text = "[F6] Chống té ngã (Anti-Tumble)",
-                Location = new Point(15, 95),
-                Size = new Size(250, 25),
+                Text = "[F5] Chống té ngã (Anti-Tumble)",
+                Location = new Point(275, 95),
+                Size = new Size(255, 25),
                 Font = itemFont,
                 ForeColor = Color.White
             };
@@ -193,21 +322,21 @@ namespace RepoTrainerApp
             this.Controls.Add(gbMovement);
             currentY += 140;
 
-            // 3. Nhóm Sinh tồn & Ánh sáng (Health & Lighting)
+            // 3. Nhóm Sinh tồn, Ánh sáng & Xe Truck (Survival, Light & Truck)
             var gbHealth = new GroupBox
             {
-                Text = " 🛡️ SINH TỒN & ÁNH SÁNG (SURVIVAL & LIGHT) ",
+                Text = " 🛡️ SINH TỒN, ÁNH SÁNG & XE TRUCK (SURVIVAL & TRUCK) ",
                 Location = new Point(15, currentY),
-                Size = new Size(535, 140),
+                Size = new Size(545, 225),
                 ForeColor = Color.LightGreen,
                 Font = titleFont
             };
 
             chkGod = new CheckBox
             {
-                Text = "[F5] Bất tử (God Mode)",
-                Location = new Point(15, 28),
-                Size = new Size(200, 25),
+                Text = "[F6] Bất tử",
+                Location = new Point(15, 26),
+                Size = new Size(125, 25),
                 Font = itemFont,
                 ForeColor = Color.White
             };
@@ -216,20 +345,31 @@ namespace RepoTrainerApp
 
             chkFullbright = new CheckBox
             {
-                Text = "[F7] SÁNG TOÀN BỘ MAP (Fullbright & No Fog)",
-                Location = new Point(220, 28),
-                Size = new Size(300, 25),
+                Text = "[F7] Sáng map",
+                Location = new Point(145, 26),
+                Size = new Size(130, 25),
                 Font = itemFont,
                 ForeColor = Color.White
             };
             chkFullbright.Click += async (s, e) => await SendCommand("toggle_fullbright");
             gbHealth.Controls.Add(chkFullbright);
 
+            chkEsp = new CheckBox
+            {
+                Text = "[F8] ESP Xuyên Tường",
+                Location = new Point(285, 26),
+                Size = new Size(240, 25),
+                Font = itemFont,
+                ForeColor = Color.Gold
+            };
+            chkEsp.Click += async (s, e) => await SendCommand("toggle_esp");
+            gbHealth.Controls.Add(chkEsp);
+
             btnHeal = new Button
             {
-                Text = "🩹 [F8] Hồi 100% Máu",
-                Location = new Point(15, 65),
-                Size = new Size(160, 32),
+                Text = "🩹 [F9] Hồi Máu",
+                Location = new Point(15, 58),
+                Size = new Size(120, 32),
                 Font = itemFont,
                 BackColor = Color.FromArgb(40, 60, 45),
                 FlatStyle = FlatStyle.Flat
@@ -239,9 +379,9 @@ namespace RepoTrainerApp
 
             btnRevive = new Button
             {
-                Text = "✨ [F9] Hồi sinh tức thì",
-                Location = new Point(185, 65),
-                Size = new Size(150, 32),
+                Text = "✨ [F10] Hồi Sinh",
+                Location = new Point(140, 58),
+                Size = new Size(120, 32),
                 Font = itemFont,
                 BackColor = Color.FromArgb(50, 45, 65),
                 FlatStyle = FlatStyle.Flat
@@ -251,9 +391,9 @@ namespace RepoTrainerApp
 
             btnMaxUpgrades = new Button
             {
-                Text = "⭐ [F10] MAX ALL UPGRADES",
-                Location = new Point(345, 65),
-                Size = new Size(175, 32),
+                Text = "⭐ [F11] Max Perks",
+                Location = new Point(265, 58),
+                Size = new Size(130, 32),
                 Font = itemFont,
                 BackColor = Color.FromArgb(70, 55, 30),
                 FlatStyle = FlatStyle.Flat
@@ -261,34 +401,68 @@ namespace RepoTrainerApp
             btnMaxUpgrades.Click += async (s, e) => await SendCommand("max_upgrades");
             gbHealth.Controls.Add(btnMaxUpgrades);
 
+            btnChargeTruck = new Button
+            {
+                Text = "⚡ [F12] Sạc Xe",
+                Location = new Point(400, 58),
+                Size = new Size(130, 32),
+                Font = itemFont,
+                BackColor = Color.FromArgb(25, 65, 75),
+                FlatStyle = FlatStyle.Flat
+            };
+            btnChargeTruck.Click += async (s, e) => await SendCommand("charge_truck");
+            gbHealth.Controls.Add(btnChargeTruck);
+
+            chkTruckEnergy = new CheckBox
+            {
+                Text = "🔋 Vô hạn Pin Xe Truck (Tự động giữ 100% pin cho Trạm Sạc / Xe)",
+                Location = new Point(15, 96),
+                Size = new Size(515, 25),
+                Font = itemFont,
+                ForeColor = Color.LightCyan
+            };
+            chkTruckEnergy.Click += async (s, e) => await SendCommand("toggle_truck_energy");
+            gbHealth.Controls.Add(chkTruckEnergy);
+
+            chkAimbot = new CheckBox
+            {
+                Text = "🎯 [Z] Aimbot Khóa Mục Tiêu (Chuột phải / V: Súng + Cận chiến + Ném Bom)",
+                Location = new Point(15, 124),
+                Size = new Size(515, 25),
+                Font = itemFont,
+                ForeColor = Color.OrangeRed
+            };
+            chkAimbot.Click += async (s, e) => await SendCommand("toggle_aimbot");
+            gbHealth.Controls.Add(chkAimbot);
+
             var lblPerkNote = new Label
             {
-                Text = "• Max Upgrades: +150 HP, Nhảy 5 lần, Đôi Cánh (Tumble Wings), Tay hút đồ 15m.",
-                Location = new Point(15, 107),
-                Size = new Size(505, 20),
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Italic),
-                ForeColor = Color.DarkGray
+                Text = "• [Z] Aimbot: Giữ Chuột Phải / V tự khóa quái (Súng, Cận chiến tự xoay trúng 100%, Bom tự căn góc ném).\n• [F1] Noclip (WASD+Space/Ctrl) | [F8] ESP Xuyên Tường | [F12] Sạc Xe Truck 100% Pin.",
+                Location = new Point(15, 154),
+                Size = new Size(515, 58),
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.LightSteelBlue
             };
             gbHealth.Controls.Add(lblPerkNote);
 
             this.Controls.Add(gbHealth);
-            currentY += 150;
+            currentY += 235;
 
             // 4. Nhóm Kho Đồ Đi Chợ (Shop Items Spawner)
             var gbItems = new GroupBox
             {
                 Text = " 🎒 KHO ĐỒ ĐI CHỢ (SHOP ITEMS SPAWNER) ",
                 Location = new Point(15, currentY),
-                Size = new Size(535, 280),
+                Size = new Size(545, 290),
                 ForeColor = Color.Khaki,
                 Font = titleFont
             };
 
             var lblSearch = new Label
             {
-                Text = "Tìm món đồ:",
-                Location = new Point(15, 26),
-                Size = new Size(85, 22),
+                Text = "Tìm:",
+                Location = new Point(15, 25),
+                Size = new Size(38, 22),
                 Font = itemFont,
                 ForeColor = Color.White
             };
@@ -296,41 +470,77 @@ namespace RepoTrainerApp
 
             txtSearchItem = new TextBox
             {
-                Location = new Point(105, 25),
-                Size = new Size(415, 25),
+                Location = new Point(55, 23),
+                Size = new Size(170, 25),
                 Font = itemFont,
                 BackColor = Color.FromArgb(35, 36, 42),
                 ForeColor = Color.White
             };
-            txtSearchItem.TextChanged += (s, e) => FilterItemsList(txtSearchItem.Text);
+            txtSearchItem.TextChanged += (s, e) => FilterItemsList();
             gbItems.Controls.Add(txtSearchItem);
+
+            var lblCat = new Label
+            {
+                Text = "Nhóm:",
+                Location = new Point(235, 25),
+                Size = new Size(50, 22),
+                Font = itemFont,
+                ForeColor = Color.White
+            };
+            gbItems.Controls.Add(lblCat);
+
+            cboCategory = new ComboBox
+            {
+                Location = new Point(288, 23),
+                Size = new Size(242, 25),
+                Font = itemFont,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(35, 36, 42),
+                ForeColor = Color.White
+            };
+            cboCategory.Items.AddRange(new object[]
+            {
+                "Tất cả danh mục",
+                "Súng",
+                "Cận chiến",
+                "Cháy nổ",
+                "Drone",
+                "Orb",
+                "Xe",
+                "Nâng cấp",
+                "Năng lượng",
+                "Y tế",
+                "Công cụ"
+            });
+            cboCategory.SelectedIndex = 0;
+            cboCategory.SelectedIndexChanged += (s, e) => FilterItemsList();
+            gbItems.Controls.Add(cboCategory);
 
             lbItems = new ListBox
             {
-                Location = new Point(15, 58),
-                Size = new Size(330, 205),
+                Location = new Point(15, 56),
+                Size = new Size(325, 220),
                 Font = itemFont,
                 BackColor = Color.FromArgb(30, 31, 36),
                 ForeColor = Color.White
             };
             gbItems.Controls.Add(lbItems);
-            FilterItemsList("");
+            FilterItemsList();
 
             btnGiveBalo = new Button
             {
                 Text = "🎒 [+ CẤT VÀO BALO]",
-                Location = new Point(355, 65),
-                Size = new Size(165, 45),
+                Location = new Point(350, 58),
+                Size = new Size(180, 45),
                 Font = titleFont,
                 BackColor = Color.FromArgb(30, 70, 45),
                 FlatStyle = FlatStyle.Flat
             };
             btnGiveBalo.Click += async (s, e) =>
             {
-                if (lbItems.SelectedItem != null)
+                if (lbItems.SelectedItem is ItemEntry entry)
                 {
-                    string item = lbItems.SelectedItem.ToString();
-                    await SendCommand("give_item", item);
+                    await SendCommand("give_item", entry.Name);
                 }
                 else
                 {
@@ -342,27 +552,26 @@ namespace RepoTrainerApp
             btnGiveGround = new Button
             {
                 Text = "📦 Thả ra đất trước mặt",
-                Location = new Point(355, 120),
-                Size = new Size(165, 38),
+                Location = new Point(350, 112),
+                Size = new Size(180, 38),
                 Font = itemFont,
                 BackColor = Color.FromArgb(50, 50, 60),
                 FlatStyle = FlatStyle.Flat
             };
             btnGiveGround.Click += async (s, e) =>
             {
-                if (lbItems.SelectedItem != null)
+                if (lbItems.SelectedItem is ItemEntry entry)
                 {
-                    string item = lbItems.SelectedItem.ToString();
-                    await SendCommand("give_item_ground", item);
+                    await SendCommand("give_item_ground", entry.Name);
                 }
             };
             gbItems.Controls.Add(btnGiveGround);
 
             var lblItemsNote = new Label
             {
-                Text = "Mẹo:\n- Chọn Laser Gun / Tranq để có súng ngay.\n- Chọn Drone Heal để hồi máu liên tục.\n- Chọn Grenade để nổ quái vật.",
-                Location = new Point(355, 175),
-                Size = new Size(165, 80),
+                Text = "Phân loại:\n• Súng, Cận chiến, Cháy nổ\n• Drones, Orbs, Xe C.A.R.T\n• Nâng cấp nhân vật, Pin\n• Xe & Pack sẽ rơi ra đất.",
+                Location = new Point(350, 158),
+                Size = new Size(180, 118),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.LightSlateGray
             };
@@ -371,17 +580,48 @@ namespace RepoTrainerApp
             this.Controls.Add(gbItems);
         }
 
-        private void FilterItemsList(string query)
+        private void FilterItemsList()
         {
-            lbItems.Items.Clear();
-            foreach (var item in allItemNames)
+            string query = txtSearchItem?.Text?.Trim()?.ToLowerInvariant() ?? "";
+            string selectedCat = cboCategory?.SelectedItem?.ToString() ?? "Tất cả danh mục";
+
+            var matched = new List<ItemEntry>();
+
+            foreach (var item in itemsCatalog)
             {
-                if (string.IsNullOrEmpty(query) || item.ToLower().Contains(query.ToLower()))
+                if (selectedCat != "Tất cả danh mục" && !item.Category.Equals(selectedCat, StringComparison.OrdinalIgnoreCase))
                 {
-                    lbItems.Items.Add(item);
+                    continue;
                 }
+
+                if (!string.IsNullOrEmpty(query))
+                {
+                    if (!item.Name.ToLowerInvariant().Contains(query) && !item.Tag.ToLowerInvariant().Contains(query))
+                    {
+                        continue;
+                    }
+                }
+
+                matched.Add(item);
+            }
+
+            // Sắp xếp phân loại cực chuẩn: Nhóm ưu tiên -> Tên A-Z
+            matched.Sort((a, b) =>
+            {
+                int catOrderA = GetCategoryOrder(a.Category);
+                int catOrderB = GetCategoryOrder(b.Category);
+                if (catOrderA != catOrderB) return catOrderA.CompareTo(catOrderB);
+                return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+            });
+
+            lbItems.BeginUpdate();
+            lbItems.Items.Clear();
+            foreach (var item in matched)
+            {
+                lbItems.Items.Add(item);
             }
             if (lbItems.Items.Count > 0) lbItems.SelectedIndex = 0;
+            lbItems.EndUpdate();
         }
 
         private void StartTimers()
@@ -392,7 +632,7 @@ namespace RepoTrainerApp
             pollTimer.Start();
 
             // 2. Timer kiểm tra Global Hotkeys toàn cầu (GetAsyncKeyState)
-            hotkeyTimer = new System.Windows.Forms.Timer { Interval = 70 };
+            hotkeyTimer = new System.Windows.Forms.Timer { Interval = 30 };
             hotkeyTimer.Tick += async (s, e) => await CheckGlobalHotkeys();
             hotkeyTimer.Start();
         }
@@ -433,12 +673,16 @@ namespace RepoTrainerApp
                 // Cập nhật trạng thái
                 if (res.Contains("\"inGame\":true"))
                 {
+                    chkNoclip.Checked = res.Contains("\"noclip\":true");
                     chkSpeed.Checked = res.Contains("\"speed\":true");
                     chkJump.Checked = res.Contains("\"jump\":true");
                     chkStamina.Checked = res.Contains("\"stamina\":true");
                     chkGod.Checked = res.Contains("\"god\":true");
                     chkTumble.Checked = res.Contains("\"tumble\":true");
                     chkFullbright.Checked = res.Contains("\"fullbright\":true");
+                    chkEsp.Checked = res.Contains("\"esp\":true");
+                    chkAimbot.Checked = res.Contains("\"aimbot\":true");
+                    chkTruckEnergy.Checked = res.Contains("\"truckenergy\":true");
 
                     // Parse máu đơn giản
                     int idxHp = res.IndexOf("\"health\":");
@@ -482,19 +726,79 @@ namespace RepoTrainerApp
                     string inner = json.Trim('[', ']');
                     var items = inner.Split(',');
                     bool changed = false;
-                    foreach (var item in items)
+                    foreach (var raw in items)
                     {
-                        string clean = item.Trim('"', ' ', '\r', '\n');
-                        if (!string.IsNullOrEmpty(clean) && !allItemNames.Contains(clean))
+                        string clean = raw.Trim('"', ' ', '\r', '\n');
+                        if (string.IsNullOrEmpty(clean)) continue;
+
+                        if (AddDynamicItem(clean))
                         {
-                            allItemNames.Add(clean);
                             changed = true;
                         }
                     }
-                    if (changed) FilterItemsList(txtSearchItem.Text);
+                    if (changed) FilterItemsList();
                 }
             }
             catch { }
+        }
+
+        private bool AddDynamicItem(string rawName)
+        {
+            string name = rawName.Trim();
+            if (name.StartsWith("Item ", StringComparison.OrdinalIgnoreCase))
+                name = name.Substring(5).Trim();
+
+            // Lọc bỏ triệt để các asset nội bộ / volumes / bộ phận mesh
+            string nLower = name.ToLowerInvariant();
+            if (nLower.StartsWith("volume") || nLower.Contains("volume") ||
+                nLower.StartsWith("shelf") || nLower.Contains("shelf") ||
+                nLower.StartsWith("valuable box") || nLower.Contains("valuable box") ||
+                nLower.StartsWith("saw ") || nLower.Contains("saw body") || nLower.Contains("saw cover") || nLower.Contains("saw handle") || nLower.Contains("saw blade") ||
+                nLower.StartsWith("ladder ") || nLower.Contains("ladder beam") || nLower.Contains("ladder end") || nLower.Contains("ladder handle") || nLower.Contains("ladder screen") ||
+                nLower.Contains("orb_") || nLower.Contains("orb mesh") || nLower.Contains("orb core") || nLower.Contains("orb icon") || nLower.Contains("orb piece") ||
+                nLower.Contains("cannon moving") || nLower.Contains("cannon barrel") || nLower.Contains("laser cannon screen") || nLower.Contains("buildup meter") ||
+                nLower.Contains("walkiebox") || nLower.Contains("walkietalkiebox") || nLower.Contains("walkietalkie 1") || nLower.Contains("walkietalkie 2") ||
+                nLower.Contains("upgrade particle") || nLower.Contains("upgrade map") || nLower.Contains("upgrade death head") ||
+                nLower.Contains("gun bullet") || nLower.Contains("gun muzzle") ||
+                nLower == "attributes" || nLower == "equip cube" || nLower == "equippable" || nLower == "manager" || nLower == "player avatar" || nLower == "stand new" || nLower == "stuff" || nLower == "unequip auto hold" ||
+                nLower == "gun" || nLower == "melee" || nLower == "mine" || nLower == "orb" || nLower == "upgrade" || nLower == "vehicle" || nLower == "staffs" || nLower == "melee weapons")
+            {
+                return false;
+            }
+
+            // Chuẩn hóa từ đồng nghĩa
+            if (name.Equals("Melee Sledge Hammer", StringComparison.OrdinalIgnoreCase)) name = "Melee Sledgehammer";
+            else if (name.Equals("Leaf blower", StringComparison.OrdinalIgnoreCase)) name = "Leaf Blower";
+            else if (name.Equals("ReviveItem", StringComparison.OrdinalIgnoreCase)) name = "Revive Item";
+            else if (name.Equals("Staff Torque", StringComparison.OrdinalIgnoreCase)) name = "Torque Staff";
+            else if (name.Equals("Staff Void", StringComparison.OrdinalIgnoreCase)) name = "Void Staff";
+            else if (name.Equals("Staff Zero Gravity", StringComparison.OrdinalIgnoreCase)) name = "Zero Gravity Staff";
+            else if (name.Equals("WalkieTalkie", StringComparison.OrdinalIgnoreCase)) name = "Walkie Talkie";
+            else if (name.Equals("Stun Baton", StringComparison.OrdinalIgnoreCase) || name.Equals("Stun Baton Variant", StringComparison.OrdinalIgnoreCase)) name = "Melee Stun Baton";
+
+            string key = name.Replace(" ", "").Replace("-", "").Replace("_", "").ToLowerInvariant();
+
+            // Kiểm tra trùng lặp
+            if (itemsCatalog.Exists(x => x.CleanKey == key || x.CleanKey == "item" + key || ("item" + x.CleanKey) == key))
+                return false;
+
+            // Phân loại nhóm thông minh
+            string cat = "Công cụ";
+            string tag = "[Công cụ]";
+
+            string lower = name.ToLowerInvariant();
+            if (lower.Contains("gun") || lower.Contains("shotgun") || lower.Contains("cannon") || lower.Contains("handgun")) { cat = "Súng"; tag = "[Súng]"; }
+            else if (lower.Contains("melee") || lower.Contains("bat") || lower.Contains("sword") || lower.Contains("hammer") || lower.Contains("baton")) { cat = "Cận chiến"; tag = "[Cận chiến]"; }
+            else if (lower.Contains("grenade") || lower.Contains("mine")) { cat = "Cháy nổ"; tag = "[Cháy nổ]"; }
+            else if (lower.Contains("drone")) { cat = "Drone"; tag = "[Drone]"; }
+            else if (lower.Contains("orb")) { cat = "Orb"; tag = "[Orb]"; }
+            else if (lower.Contains("cart") || lower.Contains("scooter") || lower.Contains("vehicle")) { cat = "Xe"; tag = "[Xe]"; }
+            else if (lower.Contains("upgrade")) { cat = "Nâng cấp"; tag = "[Nâng cấp]"; }
+            else if (lower.Contains("crystal") || lower.Contains("battery")) { cat = "Năng lượng"; tag = "[Năng lượng]"; }
+            else if (lower.Contains("health") || lower.Contains("revive") || lower.Contains("defib")) { cat = "Y tế"; tag = "[Y tế]"; }
+
+            itemsCatalog.Add(new ItemEntry { Category = cat, Tag = tag, Name = name });
+            return true;
         }
 
         private async Task SendCommand(string cmd, string val = "")
@@ -509,28 +813,34 @@ namespace RepoTrainerApp
         }
 
         // Bắt phím tắt toàn cầu (kể cả khi đang trong game)
-        private bool f2Down, f3Down, f4Down, f5Down, f6Down, f7Down, f8Down, f9Down, f10Down;
+        private bool f1Down, f2Down, f3Down, f4Down, f5Down, f6Down, f7Down, f8Down, f9Down, f10Down, f11Down, f12Down;
 
         private async Task CheckGlobalHotkeys()
         {
-            // F2 = 0x71
+            // F1 = 0x70 (Bay Xuyên Tường Noclip)
+            if ((GetAsyncKeyState(0x70) & 0x8000) != 0) { if (!f1Down) { f1Down = true; await SendCommand("toggle_noclip"); } } else f1Down = false;
+            // F2 = 0x71 (Speed Hack)
             if ((GetAsyncKeyState(0x71) & 0x8000) != 0) { if (!f2Down) { f2Down = true; await SendCommand("toggle_speed"); } } else f2Down = false;
-            // F3 = 0x72
+            // F3 = 0x72 (Vô hạn Nhảy)
             if ((GetAsyncKeyState(0x72) & 0x8000) != 0) { if (!f3Down) { f3Down = true; await SendCommand("toggle_jump"); } } else f3Down = false;
-            // F4 = 0x73
+            // F4 = 0x73 (Vô hạn Thể lực)
             if ((GetAsyncKeyState(0x73) & 0x8000) != 0) { if (!f4Down) { f4Down = true; await SendCommand("toggle_stamina"); } } else f4Down = false;
-            // F5 = 0x74
-            if ((GetAsyncKeyState(0x74) & 0x8000) != 0) { if (!f5Down) { f5Down = true; await SendCommand("toggle_god"); } } else f5Down = false;
-            // F6 = 0x75
-            if ((GetAsyncKeyState(0x75) & 0x8000) != 0) { if (!f6Down) { f6Down = true; await SendCommand("toggle_tumble"); } } else f6Down = false;
-            // F7 = 0x76 (Fullbright)
+            // F5 = 0x74 (Chống ngã Anti-Tumble)
+            if ((GetAsyncKeyState(0x74) & 0x8000) != 0) { if (!f5Down) { f5Down = true; await SendCommand("toggle_tumble"); } } else f5Down = false;
+            // F6 = 0x75 (Bất tử God Mode)
+            if ((GetAsyncKeyState(0x75) & 0x8000) != 0) { if (!f6Down) { f6Down = true; await SendCommand("toggle_god"); } } else f6Down = false;
+            // F7 = 0x76 (Fullbright Sáng map)
             if ((GetAsyncKeyState(0x76) & 0x8000) != 0) { if (!f7Down) { f7Down = true; await SendCommand("toggle_fullbright"); } } else f7Down = false;
-            // F8 = 0x77 (Hồi 100% Máu)
-            if ((GetAsyncKeyState(0x77) & 0x8000) != 0) { if (!f8Down) { f8Down = true; await SendCommand("heal"); } } else f8Down = false;
-            // F9 = 0x78 (Hồi sinh tức thì)
-            if ((GetAsyncKeyState(0x78) & 0x8000) != 0) { if (!f9Down) { f9Down = true; await SendCommand("revive"); } } else f9Down = false;
-            // F10 = 0x79 (Max Nâng Cấp)
-            if ((GetAsyncKeyState(0x79) & 0x8000) != 0) { if (!f10Down) { f10Down = true; await SendCommand("max_upgrades"); } } else f10Down = false;
+            // F8 = 0x77 (ESP Xuyên Tường)
+            if ((GetAsyncKeyState(0x77) & 0x8000) != 0) { if (!f8Down) { f8Down = true; await SendCommand("toggle_esp"); } } else f8Down = false;
+            // F9 = 0x78 (Hồi 100% Máu)
+            if ((GetAsyncKeyState(0x78) & 0x8000) != 0) { if (!f9Down) { f9Down = true; await SendCommand("heal"); } } else f9Down = false;
+            // F10 = 0x79 (Hồi sinh)
+            if ((GetAsyncKeyState(0x79) & 0x8000) != 0) { if (!f10Down) { f10Down = true; await SendCommand("revive"); } } else f10Down = false;
+            // F11 = 0x7A (Max Perks)
+            if ((GetAsyncKeyState(0x7A) & 0x8000) != 0) { if (!f11Down) { f11Down = true; await SendCommand("max_upgrades"); } } else f11Down = false;
+            // F12 = 0x7B (Sạc Xe Truck)
+            if ((GetAsyncKeyState(0x7B) & 0x8000) != 0) { if (!f12Down) { f12Down = true; await SendCommand("charge_truck"); } } else f12Down = false;
         }
     }
 }
