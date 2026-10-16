@@ -31,6 +31,7 @@ namespace RepoTrainerApp
         private CheckBox chkTumble;
         private CheckBox chkGod;
         private CheckBox chkFullbright;
+        private CheckBox chkNoCameraShake;
         private CheckBox chkEsp;
         private CheckBox chkAimbot;
 
@@ -181,7 +182,7 @@ namespace RepoTrainerApp
         private void InitializeComponent()
         {
             this.Text = "★ R.E.P.O. Master External Trainer v2.1 ★";
-            this.Size = new Size(590, 805);
+            this.Size = new Size(590, 835);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.BackColor = Color.FromArgb(24, 25, 29);
             this.ForeColor = Color.White;
@@ -232,7 +233,7 @@ namespace RepoTrainerApp
             {
                 Text = " 🏃 DI CHUYỂN (MOVEMENT) ",
                 Location = new Point(15, currentY),
-                Size = new Size(545, 130),
+                Size = new Size(545, 160),
                 ForeColor = Color.SkyBlue,
                 Font = titleFont
             };
@@ -319,8 +320,20 @@ namespace RepoTrainerApp
             chkTumble.Click += async (s, e) => await SendCommand("toggle_tumble");
             gbMovement.Controls.Add(chkTumble);
 
+            chkNoCameraShake = new CheckBox
+            {
+                Text = "🚫 Tắt rung lắc camera (Chống chóng mặt)",
+                Location = new Point(15, 126),
+                Size = new Size(320, 25),
+                Font = itemFont,
+                ForeColor = Color.LightPink,
+                Checked = true
+            };
+            chkNoCameraShake.Click += async (s, e) => await SendCommand("toggle_camera_shake");
+            gbMovement.Controls.Add(chkNoCameraShake);
+
             this.Controls.Add(gbMovement);
-            currentY += 140;
+            currentY += 170;
 
             // 3. Nhóm Sinh tồn, Ánh sáng & Xe Truck (Survival, Light & Truck)
             var gbHealth = new GroupBox
@@ -403,9 +416,9 @@ namespace RepoTrainerApp
 
             btnChargeTruck = new Button
             {
-                Text = "⚡ [F12] Sạc Xe",
-                Location = new Point(400, 58),
-                Size = new Size(130, 32),
+                Text = "⚡ [F12] Sạc Xe [Chỉ Host]",
+                Location = new Point(395, 58),
+                Size = new Size(135, 32),
                 Font = itemFont,
                 BackColor = Color.FromArgb(25, 65, 75),
                 FlatStyle = FlatStyle.Flat
@@ -415,7 +428,7 @@ namespace RepoTrainerApp
 
             chkTruckEnergy = new CheckBox
             {
-                Text = "🔋 Vô hạn Pin Xe Truck (Tự động giữ 100% pin cho Trạm Sạc / Xe)",
+                Text = "🔋 Vô hạn Pin Xe Truck [Chỉ Host] (Tự động giữ 100% pin cho Trạm Sạc / Xe)",
                 Location = new Point(15, 96),
                 Size = new Size(515, 25),
                 Font = itemFont,
@@ -437,7 +450,7 @@ namespace RepoTrainerApp
 
             var lblPerkNote = new Label
             {
-                Text = "• [Z] Aimbot: Giữ Chuột Phải / V tự khóa quái (Súng, Cận chiến tự xoay trúng 100%, Bom tự căn góc ném).\n• [F1] Noclip (WASD+Space/Ctrl) | [F8] ESP Xuyên Tường | [F12] Sạc Xe Truck 100% Pin.",
+                Text = "• [Z] Aimbot: Giữ Chuột Phải / V tự khóa quái (Súng, Cận chiến tự xoay trúng 100%, Bom tự căn góc ném).\n• [F1] Noclip | [F8] ESP 3D Box Xuyên Tường | [F11] Max Perks (Tầm nhặt 25m, siêu khỏe).\n• [Chỉ Host]: Sạc Xe [F12], Vô hạn pin xe, và Kho sinh vật phẩm.",
                 Location = new Point(15, 154),
                 Size = new Size(515, 58),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
@@ -451,7 +464,7 @@ namespace RepoTrainerApp
             // 4. Nhóm Kho Đồ Đi Chợ (Shop Items Spawner)
             var gbItems = new GroupBox
             {
-                Text = " 🎒 KHO ĐỒ ĐI CHỢ (SHOP ITEMS SPAWNER) ",
+                Text = " 🎒 KHO ĐỒ ĐI CHỢ (SHOP ITEMS SPAWNER) [Chỉ Host] ",
                 Location = new Point(15, currentY),
                 Size = new Size(545, 290),
                 ForeColor = Color.Khaki,
@@ -569,11 +582,11 @@ namespace RepoTrainerApp
 
             var lblItemsNote = new Label
             {
-                Text = "Phân loại:\n• Súng, Cận chiến, Cháy nổ\n• Drones, Orbs, Xe C.A.R.T\n• Nâng cấp nhân vật, Pin\n• Xe & Pack sẽ rơi ra đất.",
+                Text = "⚠️ LƯU Ý HOST:\n• Sinh đồ & Sạc xe chỉ hoạt động khi bạn là HOST (Chủ phòng).\n• Khi là Khách, cheat Player, Noclip, ESP 3D, Aimbot vẫn hoạt động bình thường.",
                 Location = new Point(350, 158),
                 Size = new Size(180, 118),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
-                ForeColor = Color.LightSlateGray
+                ForeColor = Color.LightSalmon
             };
             gbItems.Controls.Add(lblItemsNote);
 
@@ -680,6 +693,7 @@ namespace RepoTrainerApp
                     chkGod.Checked = res.Contains("\"god\":true");
                     chkTumble.Checked = res.Contains("\"tumble\":true");
                     chkFullbright.Checked = res.Contains("\"fullbright\":true");
+                    chkNoCameraShake.Checked = res.Contains("\"noCameraShake\":true");
                     chkEsp.Checked = res.Contains("\"esp\":true");
                     chkAimbot.Checked = res.Contains("\"aimbot\":true");
                     chkTruckEnergy.Checked = res.Contains("\"truckenergy\":true");

@@ -76,6 +76,17 @@ namespace RepoModMenu
         private static readonly FieldInfo FieldPaPlayerName = typeof(PlayerAvatar).GetField("playerName", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldPaIsLocal = typeof(PlayerAvatar).GetField("isLocal", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
+        private static readonly FieldInfo FieldIeIsEquipped = typeof(ItemEquippable).GetField("isEquipped", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldIeEquippedSpot = typeof(ItemEquippable).GetField("equippedSpot", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly FieldInfo FieldCbMultiplier = typeof(CameraBob).GetField("Multiplier", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldCbMultiplierTarget = typeof(CameraBob).GetField("MultiplierTarget", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldCbPositionResult = typeof(CameraBob).GetField("positionResult", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldCbRotationResult = typeof(CameraBob).GetField("rotationResult", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly FieldInfo FieldCjJumpActive = typeof(CameraJump).GetField("jumpActive", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldCjLandActive = typeof(CameraJump).GetField("landActive", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
         // Cheats & Settings (Public for IPC)
         public static bool EnableSpeedHack = false;
         public static float SpeedMultiplier = 2.5f;
@@ -101,13 +112,18 @@ namespace RepoModMenu
         private bool origFog;
         private float origFogDensity;
 
-        // ESP X-Ray
+        // Camera Shake & Bobbing Elimination
+        public static bool DisableCameraShake = true;
+
+        // ESP X-Ray & 3D Bounding Boxes
         public class EspEntry
         {
             public Transform Transform;
+            public Vector3 CenterOffset;
+            public Vector3 Extents;
             public string Name;
             public string ExtraInfo;
-            public int Type; // 0: Enemy, 1: Valuable, 2: Teammate
+            public int Type; // 0: Enemy, 1: Valuable, 2: Teammate, 3: Extractor, 4: Dropped Item, 5: Dead Player Head, 6: Cart
             public EnemyHealth EnemyHealth;
         }
 
@@ -117,8 +133,16 @@ namespace RepoModMenu
         private GUIStyle espEnemyStyle;
         private GUIStyle espValuableStyle;
         private GUIStyle espPlayerStyle;
+        private GUIStyle espExtractorStyle;
+        private GUIStyle espDroppedItemStyle;
+        private GUIStyle espDeadHeadStyle;
+        private GUIStyle espCartStyle;
         private GUIStyle espBackgroundBoxStyle;
         private Texture2D espBoxTex;
+        private static Texture2D lineTex;
+
+        // Max Perks
+        public static bool MaxPerksActive = false;
 
         // Noclip / Bay Xuyên Tường
         public static bool EnableNoclip = false;
@@ -379,6 +403,7 @@ namespace RepoModMenu
                    $"\"god\":{EnableGodMode.ToString().ToLower()}," +
                    $"\"tumble\":{EnableNoTumble.ToString().ToLower()}," +
                    $"\"fullbright\":{EnableFullbright.ToString().ToLower()}," +
+                   $"\"noCameraShake\":{DisableCameraShake.ToString().ToLower()}," +
                    $"\"esp\":{EnableEsp.ToString().ToLower()}," +
                    $"\"aimbot\":{EnableAimbot.ToString().ToLower()}," +
                    $"\"truckEnergy\":{EnableInfiniteTruckEnergy.ToString().ToLower()}," +
@@ -441,12 +466,18 @@ namespace RepoModMenu
             ShowNotification($"ESP Nhìn Xuyên Tường: {(EnableEsp ? "BẬT" : "TẮT")}");
         }
 
+        private void ToggleCameraShake()
+        {
+            DisableCameraShake = !DisableCameraShake;
+            ShowNotification(DisableCameraShake ? "Đã TẮT Rung Lắc Camera (Chống Chóng Mặt)" : "Đã BẬT lại Rung Lắc Camera");
+        }
+
         private void ToggleTruckEnergy()
         {
             if (Time.unscaledTime - lastTruckEnergyTime < 0.35f) return;
             lastTruckEnergyTime = Time.unscaledTime;
             EnableInfiniteTruckEnergy = !EnableInfiniteTruckEnergy;
-            ShowNotification($"Vô hạn Pin Xe Truck: {(EnableInfiniteTruckEnergy ? "BẬT" : "TẮT")}");
+            ShowNotification($"Vô hạn Pin Xe Truck [Chỉ Host]: {(EnableInfiniteTruckEnergy ? "BẬT" : "TẮT")}");
         }
 
         private void ToggleAimbot()
@@ -519,6 +550,9 @@ namespace RepoModMenu
                 case "toggle_fullbright":
                     ToggleFullbright();
                     break;
+                case "toggle_camera_shake":
+                    ToggleCameraShake();
+                    break;
                 case "toggle_esp":
                     ToggleEsp();
                     break;
@@ -571,7 +605,7 @@ namespace RepoModMenu
 
                 try { MethodCsCrystalsItShouldHave?.Invoke(cs, null); } catch { }
                 try { MethodCsStartCharge?.Invoke(cs, null); } catch { }
-                ShowNotification("⚡ Đã sạc ĐẦY 100% Pin cho Xe Truck!");
+                ShowNotification("⚡ Đã sạc ĐẦY 100% Pin cho Xe Truck! (Lưu ý: Chỉ đồng bộ khi bạn là HOST)");
             }
             else
             {
@@ -699,11 +733,89 @@ namespace RepoModMenu
                 FieldCrouchRest?.SetValue(controller.playerAvatarScript, 1f);
             }
 
-            CustomGrabRange = 15f;
-            CustomGrabStrength = 5f;
-            CustomThrowStrength = 3.5f;
+            CustomGrabRange = 25f;
+            CustomGrabStrength = 10f;
+            CustomThrowStrength = 8f;
+            MaxPerksActive = true;
 
-            ShowNotification("Đã Max tất cả chỉ số Nâng Cấp!");
+            if (controller.playerAvatarScript != null && controller.playerAvatarScript.physGrabber != null)
+            {
+                EnforceMaxPhysGrabber(controller.playerAvatarScript.physGrabber);
+            }
+
+            ShowNotification("⭐ Đã Max tất cả chỉ số (Máu, Mana, Nhảy, Tầm Cầm 25m & Sức Nâng Vô Song)!");
+        }
+
+        private void EnforceMaxPhysGrabber(PhysGrabber grabber)
+        {
+            if (grabber == null) return;
+            grabber.grabRange = 25f;
+            grabber.grabReleaseDistance = 35f;
+            grabber.minDistanceFromPlayer = 0.5f;
+            grabber.maxDistanceFromPlayer = 25f;
+            grabber.grabStrength = 10f;
+            grabber.throwStrength = 8f;
+            grabber.forceMax = 5000f;
+            grabber.forceConstant = 1500f;
+        }
+
+        private void ApplyNoCameraShake()
+        {
+            try
+            {
+                var shakes = FindObjectsOfType<CameraShake>();
+                if (shakes != null)
+                {
+                    foreach (var s in shakes)
+                    {
+                        if (s == null) continue;
+                        s.Strength = 0f;
+                        s.StrengthMax = 0f;
+                        s.PositionMultiplier = 0f;
+                        s.RotationMultiplier = 0f;
+                        s.transform.localPosition = Vector3.zero;
+                        s.transform.localRotation = Quaternion.identity;
+                    }
+                }
+
+                var bobs = FindObjectsOfType<CameraBob>();
+                if (bobs != null)
+                {
+                    foreach (var b in bobs)
+                    {
+                        if (b == null) continue;
+                        b.bobUpLerpStrength = 0f;
+                        b.bobSideLerpStrength = 0f;
+                        b.SprintSpeedMultiplier = 0f;
+                        b.CrouchSpeedMultiplier = 0f;
+                        b.CrouchAmountMultiplier = 0f;
+                        FieldCbMultiplier?.SetValue(b, 0f);
+                        FieldCbMultiplierTarget?.SetValue(b, 0f);
+                        FieldCbPositionResult?.SetValue(b, Vector3.zero);
+                        FieldCbRotationResult?.SetValue(b, Quaternion.identity);
+                        b.transform.localPosition = Vector3.zero;
+                        b.transform.localRotation = Quaternion.identity;
+                    }
+                }
+
+                var jumps = FindObjectsOfType<CameraJump>();
+                if (jumps != null)
+                {
+                    foreach (var j in jumps)
+                    {
+                        if (j == null) continue;
+                        j.jumpPosition = Vector3.zero;
+                        j.jumpRotation = Vector3.zero;
+                        j.landPosition = Vector3.zero;
+                        j.landRotation = Vector3.zero;
+                        FieldCjJumpActive?.SetValue(j, false);
+                        FieldCjLandActive?.SetValue(j, false);
+                        j.transform.localPosition = Vector3.zero;
+                        j.transform.localRotation = Quaternion.identity;
+                    }
+                }
+            }
+            catch { }
         }
 
         private void Update()
@@ -838,9 +950,16 @@ namespace RepoModMenu
                     upgradesInitialized = true;
                 }
 
-                grabber.grabRange = CustomGrabRange;
-                grabber.grabStrength = CustomGrabStrength;
-                grabber.throwStrength = CustomThrowStrength;
+                if (MaxPerksActive || CustomGrabRange > 10f)
+                {
+                    EnforceMaxPhysGrabber(grabber);
+                }
+                else
+                {
+                    grabber.grabRange = CustomGrabRange;
+                    grabber.grabStrength = CustomGrabStrength;
+                    grabber.throwStrength = CustomThrowStrength;
+                }
             }
 
             PlayerHealth health = GetLocalPlayerHealth(controller);
@@ -877,6 +996,11 @@ namespace RepoModMenu
 
             ApplyNoclip();
             ApplyMapLighting();
+
+            if (DisableCameraShake)
+            {
+                ApplyNoCameraShake();
+            }
         }
 
         private static bool IsKeyHit(KeyCode legacyKey, Key newKey)
@@ -1446,7 +1570,29 @@ namespace RepoModMenu
                 {
                     RenderSettings.fog = false;
                     RenderSettings.fogDensity = 0f;
+                    RenderSettings.fogStartDistance = 1000f;
+                    RenderSettings.fogEndDistance = 2000f;
                 }
+
+                try
+                {
+                    var allCams = Camera.allCameras;
+                    if (allCams != null)
+                    {
+                        foreach (var c in allCams)
+                        {
+                            if (c != null && c.farClipPlane < 1000f)
+                            {
+                                c.farClipPlane = 1000f;
+                            }
+                        }
+                    }
+                    if (Camera.main != null && Camera.main.farClipPlane < 1000f)
+                    {
+                        Camera.main.farClipPlane = 1000f;
+                    }
+                }
+                catch { }
 
                 if (mapDirectionalLightObj == null)
                 {
@@ -1811,6 +1957,73 @@ namespace RepoModMenu
             return sb.ToString().Trim();
         }
 
+        private static void DrawScreenLine(Vector2 p1, Vector2 p2, Color color, float width = 1.5f)
+        {
+            if (lineTex == null)
+            {
+                lineTex = new Texture2D(1, 1);
+                lineTex.SetPixel(0, 0, Color.white);
+                lineTex.Apply();
+            }
+
+            Color old = GUI.color;
+            GUI.color = color;
+            Vector2 diff = p2 - p1;
+            float length = diff.magnitude;
+            if (length < 0.5f) { GUI.color = old; return; }
+
+            float angle = Mathf.Atan2(diff.y, diff.x) * Mathf.Rad2Deg;
+            GUIUtility.RotateAroundPivot(angle, p1);
+            GUI.DrawTexture(new Rect(p1.x, p1.y - width * 0.5f, length, width), lineTex);
+            GUIUtility.RotateAroundPivot(-angle, p1);
+            GUI.color = old;
+        }
+
+        private static bool Draw3DBox(Camera cam, Vector3 center, Vector3 extents, Quaternion rotation, Color color, float lineWidth = 1.5f)
+        {
+            Vector3 right = rotation * Vector3.right * extents.x;
+            Vector3 up = rotation * Vector3.up * extents.y;
+            Vector3 forward = rotation * Vector3.forward * extents.z;
+
+            Vector3[] corners = new Vector3[8]
+            {
+                center + right + up + forward, // 0
+                center - right + up + forward, // 1
+                center - right + up - forward, // 2
+                center + right + up - forward, // 3
+                center + right - up + forward, // 4
+                center - right - up + forward, // 5
+                center - right - up - forward, // 6
+                center + right - up - forward  // 7
+            };
+
+            Vector2[] screenCorners = new Vector2[8];
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 sp = cam.WorldToScreenPoint(corners[i]);
+                if (sp.z <= 0.1f) return false;
+                screenCorners[i] = new Vector2(sp.x, Screen.height - sp.y);
+            }
+
+            // 12 cạnh khung hộp 3D
+            DrawScreenLine(screenCorners[0], screenCorners[1], color, lineWidth);
+            DrawScreenLine(screenCorners[1], screenCorners[2], color, lineWidth);
+            DrawScreenLine(screenCorners[2], screenCorners[3], color, lineWidth);
+            DrawScreenLine(screenCorners[3], screenCorners[0], color, lineWidth);
+
+            DrawScreenLine(screenCorners[4], screenCorners[5], color, lineWidth);
+            DrawScreenLine(screenCorners[5], screenCorners[6], color, lineWidth);
+            DrawScreenLine(screenCorners[6], screenCorners[7], color, lineWidth);
+            DrawScreenLine(screenCorners[7], screenCorners[4], color, lineWidth);
+
+            DrawScreenLine(screenCorners[0], screenCorners[4], color, lineWidth);
+            DrawScreenLine(screenCorners[1], screenCorners[5], color, lineWidth);
+            DrawScreenLine(screenCorners[2], screenCorners[6], color, lineWidth);
+            DrawScreenLine(screenCorners[3], screenCorners[7], color, lineWidth);
+
+            return true;
+        }
+
         private void UpdateEspTargets()
         {
             if (!EnableEsp) return;
@@ -1819,7 +2032,7 @@ namespace RepoModMenu
 
             try
             {
-                // 1. Quét Quái vật (Enemies) - CHỈ quét quái thực sự còn sống và đã spawn, loại bỏ hoàn toàn khung ảo / vật thể không phải quái
+                // 1. Quét Quái vật (Enemies - Type 0)
                 var processedEnemies = new HashSet<Enemy>();
 
                 var enemies = FindObjectsOfType<EnemyParent>();
@@ -1828,14 +2041,8 @@ namespace RepoModMenu
                     foreach (var ep in enemies)
                     {
                         if (ep == null) continue;
-
-                        // Bỏ qua nếu chưa spawn
                         if (FieldEpSpawned != null && !(bool)FieldEpSpawned.GetValue(ep)) continue;
-
-                        // Bỏ qua nếu đang trong trạng thái despawn
                         if (FieldEpDespawnedTimer != null && (float)FieldEpDespawnedTimer.GetValue(ep) > 0f) continue;
-
-                        // Bỏ qua nếu EnableObject bị tắt
                         if (FieldEpEnableObject != null)
                         {
                             var enableObj = FieldEpEnableObject.GetValue(ep) as GameObject;
@@ -1843,32 +2050,16 @@ namespace RepoModMenu
                         }
 
                         Enemy enemy = null;
-                        if (FieldEpEnemy != null)
-                        {
-                            enemy = FieldEpEnemy.GetValue(ep) as Enemy;
-                        }
-                        if (enemy == null)
-                        {
-                            enemy = ep.GetComponentInChildren<Enemy>();
-                        }
-
-                        if (enemy == null) continue;
-                        if (processedEnemies.Contains(enemy)) continue;
+                        if (FieldEpEnemy != null) enemy = FieldEpEnemy.GetValue(ep) as Enemy;
+                        if (enemy == null) enemy = ep.GetComponentInChildren<Enemy>();
+                        if (enemy == null || processedEnemies.Contains(enemy)) continue;
                         processedEnemies.Add(enemy);
 
-                        // Bỏ qua nếu enemy đang ở trạng thái Despawn
                         if (enemy.CurrentState == EnemyState.Despawn) continue;
 
-                        // Lấy thông tin máu & kiểm tra còn sống không
                         EnemyHealth eh = null;
-                        if (FieldEnemyHealth != null)
-                        {
-                            eh = FieldEnemyHealth.GetValue(enemy) as EnemyHealth;
-                        }
-                        if (eh == null)
-                        {
-                            eh = enemy.GetComponentInChildren<EnemyHealth>() ?? ep.GetComponentInChildren<EnemyHealth>();
-                        }
+                        if (FieldEnemyHealth != null) eh = FieldEnemyHealth.GetValue(enemy) as EnemyHealth;
+                        if (eh == null) eh = enemy.GetComponentInChildren<EnemyHealth>() ?? ep.GetComponentInChildren<EnemyHealth>();
 
                         int curHp = 0;
                         if (eh != null)
@@ -1881,16 +2072,20 @@ namespace RepoModMenu
                             }
                         }
 
-                        // TỌA ĐỘ THEO DÕI TUYỆT ĐỐI CỦA QUÁI:
-                        // Sử dụng CenterTransform (trọng tâm cơ thể quái đang di chuyển) để bám theo 100% thời gian thực
                         Transform trackingT = null;
-                        if (FieldEnemyCenterTransform != null)
+                        if (FieldEnemyCenterTransform != null) trackingT = FieldEnemyCenterTransform.GetValue(enemy) as Transform;
+                        if (trackingT == null) trackingT = enemy.transform;
+
+                        Vector3 ext = new Vector3(0.5f, 0.9f, 0.5f);
+                        Vector3 offset = Vector3.zero;
+                        var col = enemy.GetComponentInChildren<Collider>();
+                        if (col != null && col.bounds.size.magnitude > 0.2f && col.bounds.size.magnitude < 15f)
                         {
-                            trackingT = FieldEnemyCenterTransform.GetValue(enemy) as Transform;
-                        }
-                        if (trackingT == null)
-                        {
-                            trackingT = enemy.transform;
+                            ext = col.bounds.extents;
+                            ext.x = Mathf.Clamp(ext.x, 0.35f, 2.5f);
+                            ext.y = Mathf.Clamp(ext.y, 0.45f, 3.0f);
+                            ext.z = Mathf.Clamp(ext.z, 0.35f, 2.5f);
+                            offset = col.bounds.center - trackingT.position;
                         }
 
                         string eName = GetEnemyName(ep, enemy);
@@ -1899,6 +2094,8 @@ namespace RepoModMenu
                         newEntries.Add(new EspEntry
                         {
                             Transform = trackingT,
+                            CenterOffset = offset,
+                            Extents = ext,
                             Name = eName,
                             ExtraInfo = extra,
                             Type = 0,
@@ -1907,7 +2104,6 @@ namespace RepoModMenu
                     }
                 }
 
-                // Quét bổ sung các Enemy độc lập (nếu có trường hợp quái không qua EnemyParent)
                 var standaloneEnemies = FindObjectsOfType<Enemy>();
                 if (standaloneEnemies != null)
                 {
@@ -1917,14 +2113,8 @@ namespace RepoModMenu
                         processedEnemies.Add(enemy);
 
                         EnemyParent ep = null;
-                        if (FieldEnemyParent != null)
-                        {
-                            ep = FieldEnemyParent.GetValue(enemy) as EnemyParent;
-                        }
-                        if (ep == null)
-                        {
-                            ep = enemy.GetComponentInParent<EnemyParent>();
-                        }
+                        if (FieldEnemyParent != null) ep = FieldEnemyParent.GetValue(enemy) as EnemyParent;
+                        if (ep == null) ep = enemy.GetComponentInParent<EnemyParent>();
 
                         if (ep != null)
                         {
@@ -1954,13 +2144,19 @@ namespace RepoModMenu
                         }
 
                         Transform trackingT = null;
-                        if (FieldEnemyCenterTransform != null)
+                        if (FieldEnemyCenterTransform != null) trackingT = FieldEnemyCenterTransform.GetValue(enemy) as Transform;
+                        if (trackingT == null) trackingT = enemy.transform;
+
+                        Vector3 ext = new Vector3(0.5f, 0.9f, 0.5f);
+                        Vector3 offset = Vector3.zero;
+                        var col = enemy.GetComponentInChildren<Collider>();
+                        if (col != null && col.bounds.size.magnitude > 0.2f && col.bounds.size.magnitude < 15f)
                         {
-                            trackingT = FieldEnemyCenterTransform.GetValue(enemy) as Transform;
-                        }
-                        if (trackingT == null)
-                        {
-                            trackingT = enemy.transform;
+                            ext = col.bounds.extents;
+                            ext.x = Mathf.Clamp(ext.x, 0.35f, 2.5f);
+                            ext.y = Mathf.Clamp(ext.y, 0.45f, 3.0f);
+                            ext.z = Mathf.Clamp(ext.z, 0.35f, 2.5f);
+                            offset = col.bounds.center - trackingT.position;
                         }
 
                         string eName = GetEnemyName(ep, enemy);
@@ -1969,6 +2165,8 @@ namespace RepoModMenu
                         newEntries.Add(new EspEntry
                         {
                             Transform = trackingT,
+                            CenterOffset = offset,
+                            Extents = ext,
                             Name = eName,
                             ExtraInfo = extra,
                             Type = 0,
@@ -1981,7 +2179,7 @@ namespace RepoModMenu
 
             try
             {
-                // 2. Quét Đồ giá trị (Valuables)
+                // 2. Quét Đồ giá trị (Valuables - Type 1)
                 var valuables = FindObjectsOfType<ValuableObject>();
                 if (valuables != null)
                 {
@@ -2003,9 +2201,23 @@ namespace RepoModMenu
                         else if (price > 0) extra = $"${price}";
                         else if (mass > 0f) extra = $"{mass:0.#}kg";
 
+                        Vector3 ext = new Vector3(0.35f, 0.35f, 0.35f);
+                        Vector3 offset = Vector3.zero;
+                        var col = val.GetComponent<Collider>() ?? val.GetComponentInChildren<Collider>();
+                        if (col != null && col.bounds.size.magnitude > 0.1f && col.bounds.size.magnitude < 10f)
+                        {
+                            ext = col.bounds.extents;
+                            ext.x = Mathf.Clamp(ext.x, 0.18f, 1.8f);
+                            ext.y = Mathf.Clamp(ext.y, 0.18f, 1.8f);
+                            ext.z = Mathf.Clamp(ext.z, 0.18f, 1.8f);
+                            offset = col.bounds.center - val.transform.position;
+                        }
+
                         newEntries.Add(new EspEntry
                         {
                             Transform = val.transform,
+                            CenterOffset = offset,
+                            Extents = ext,
                             Name = "",
                             ExtraInfo = extra,
                             Type = 1
@@ -2017,7 +2229,7 @@ namespace RepoModMenu
 
             try
             {
-                // 3. Quét Đồng đội (Teammates)
+                // 3. Quét Đồng đội (Teammates - Type 2)
                 var players = FindObjectsOfType<PlayerAvatar>();
                 if (players != null)
                 {
@@ -2033,8 +2245,110 @@ namespace RepoModMenu
                         newEntries.Add(new EspEntry
                         {
                             Transform = p.transform,
+                            CenterOffset = Vector3.up * 0.9f,
+                            Extents = new Vector3(0.45f, 0.9f, 0.45f),
                             Name = pname,
                             Type = 2
+                        });
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                // 4. Quét Extractor (Trạm rút - Type 3)
+                var extractors = FindObjectsOfType<ExtractionPoint>();
+                if (extractors != null)
+                {
+                    foreach (var ep in extractors)
+                    {
+                        if (ep == null || ep.transform == null) continue;
+                        Transform t = ep.extractionTube != null ? ep.extractionTube : ep.transform;
+                        newEntries.Add(new EspEntry
+                        {
+                            Transform = t,
+                            CenterOffset = Vector3.up * 1.5f,
+                            Extents = new Vector3(1.6f, 1.5f, 1.6f),
+                            Name = "EXTRACTOR",
+                            Type = 3
+                        });
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                // 5. Quét Vật phẩm mua bị rơi (Dropped Items - Type 4)
+                var items = FindObjectsOfType<ItemEquippable>();
+                if (items != null)
+                {
+                    foreach (var ie in items)
+                    {
+                        if (FieldIeIsEquipped != null && (bool)FieldIeIsEquipped.GetValue(ie)) continue;
+                        if (FieldIeEquippedSpot != null && FieldIeEquippedSpot.GetValue(ie) != null) continue;
+                        if (ie.GetComponent<ValuableObject>() != null || ie.GetComponentInParent<ValuableObject>() != null) continue;
+                        if (ie.GetComponentInParent<PlayerAvatar>() != null) continue;
+
+                        string itName = "";
+                        var itComp = ie.GetComponent<Item>() ?? ie.GetComponentInParent<Item>();
+                        if (itComp != null)
+                        {
+                            itName = !string.IsNullOrEmpty(itComp.itemName) ? itComp.itemName : itComp.name;
+                        }
+                        if (string.IsNullOrEmpty(itName))
+                        {
+                            itName = ie.gameObject.name.Replace("(Clone)", "").Trim();
+                        }
+                        if (itName.StartsWith("Item ", StringComparison.OrdinalIgnoreCase))
+                            itName = itName.Substring(5).Trim();
+
+                        newEntries.Add(new EspEntry
+                        {
+                            Transform = ie.transform,
+                            Name = itName,
+                            Type = 4
+                        });
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                // 6. Quét Đầu người chơi chết cần cứu (Dead Player Heads - Type 5)
+                var heads = FindObjectsOfType<PlayerDeathHead>();
+                if (heads != null)
+                {
+                    foreach (var h in heads)
+                    {
+                        if (h == null || h.transform == null || !h.gameObject.activeInHierarchy) continue;
+                        newEntries.Add(new EspEntry
+                        {
+                            Transform = h.transform,
+                            Name = "Cứu Đồng Đội",
+                            Type = 5
+                        });
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                // 7. Quét Xe đẩy (Carts - Type 6)
+                var carts = FindObjectsOfType<PhysGrabCart>();
+                if (carts != null)
+                {
+                    foreach (var c in carts)
+                    {
+                        if (c == null || c.transform == null || !c.gameObject.activeInHierarchy) continue;
+                        newEntries.Add(new EspEntry
+                        {
+                            Transform = c.transform,
+                            Name = "Xe Đẩy",
+                            Type = 6
                         });
                     }
                 }
@@ -2061,32 +2375,60 @@ namespace RepoModMenu
             if (espEnemyStyle == null)
             {
                 espBoxTex = new Texture2D(1, 1);
-                espBoxTex.SetPixel(0, 0, new Color(0f, 0f, 0f, 0.70f));
+                espBoxTex.SetPixel(0, 0, new Color(0f, 0f, 0f, 0.72f));
                 espBoxTex.Apply();
 
                 espBackgroundBoxStyle = new GUIStyle();
                 espBackgroundBoxStyle.normal.background = espBoxTex;
 
-                // Quái vật: Chữ màu ĐỎ TƯƠI nổi bật (báo hiệu nguy hiểm), cỡ chữ 11 đậm
+                // Quái vật: Đỏ tươi nổi bật
                 espEnemyStyle = new GUIStyle();
                 espEnemyStyle.fontSize = 11;
                 espEnemyStyle.fontStyle = FontStyle.Bold;
-                espEnemyStyle.normal.textColor = new Color(1f, 0.22f, 0.22f, 1f); // Màu đỏ tươi
+                espEnemyStyle.normal.textColor = new Color(1f, 0.25f, 0.25f, 1f);
                 espEnemyStyle.alignment = TextAnchor.MiddleCenter;
 
-                // Đồ đạc: Giá tiền + Cân nặng màu vàng, cỡ chữ 10 thu nhỏ
+                // Đồ đạc: Vàng
                 espValuableStyle = new GUIStyle();
                 espValuableStyle.fontSize = 10;
                 espValuableStyle.fontStyle = FontStyle.Bold;
-                espValuableStyle.normal.textColor = new Color(1f, 0.88f, 0.15f, 1f); // Màu vàng
+                espValuableStyle.normal.textColor = new Color(1f, 0.88f, 0.15f, 1f);
                 espValuableStyle.alignment = TextAnchor.MiddleCenter;
 
-                // Đồng đội: Chữ màu trắng, cỡ chữ 10 thu nhỏ
+                // Đồng đội: Cyan
                 espPlayerStyle = new GUIStyle();
                 espPlayerStyle.fontSize = 10;
                 espPlayerStyle.fontStyle = FontStyle.Bold;
-                espPlayerStyle.normal.textColor = Color.white;
+                espPlayerStyle.normal.textColor = new Color(0.2f, 0.9f, 1f, 1f);
                 espPlayerStyle.alignment = TextAnchor.MiddleCenter;
+
+                // Extractor: Xanh lá neon
+                espExtractorStyle = new GUIStyle();
+                espExtractorStyle.fontSize = 11;
+                espExtractorStyle.fontStyle = FontStyle.Bold;
+                espExtractorStyle.normal.textColor = new Color(0.25f, 1f, 0.45f, 1f);
+                espExtractorStyle.alignment = TextAnchor.MiddleCenter;
+
+                // Vật phẩm rơi: Tím hồng
+                espDroppedItemStyle = new GUIStyle();
+                espDroppedItemStyle.fontSize = 10;
+                espDroppedItemStyle.fontStyle = FontStyle.Bold;
+                espDroppedItemStyle.normal.textColor = new Color(0.85f, 0.5f, 1f, 1f);
+                espDroppedItemStyle.alignment = TextAnchor.MiddleCenter;
+
+                // Đầu chết: Cam đỏ
+                espDeadHeadStyle = new GUIStyle();
+                espDeadHeadStyle.fontSize = 10;
+                espDeadHeadStyle.fontStyle = FontStyle.Bold;
+                espDeadHeadStyle.normal.textColor = new Color(1f, 0.38f, 0.15f, 1f);
+                espDeadHeadStyle.alignment = TextAnchor.MiddleCenter;
+
+                // Xe đẩy: Vàng cam
+                espCartStyle = new GUIStyle();
+                espCartStyle.fontSize = 10;
+                espCartStyle.fontStyle = FontStyle.Bold;
+                espCartStyle.normal.textColor = new Color(1f, 0.75f, 0.2f, 1f);
+                espCartStyle.alignment = TextAnchor.MiddleCenter;
             }
 
             List<EspEntry> entries;
@@ -2099,62 +2441,117 @@ namespace RepoModMenu
             {
                 if (entry == null || entry.Transform == null) continue;
 
-                Vector3 targetPos = entry.Transform.position;
-                float dist = Vector3.Distance(camPos, targetPos);
+                Vector3 basePos = entry.Transform.position;
+                float dist = Vector3.Distance(camPos, basePos);
 
-                // Thu khoảng cách thấy lại để tránh rối mắt
-                if (entry.Type == 0 && dist > 55f) continue;  // Quái: 55m
-                if (entry.Type == 1 && dist > 28f) continue;  // Đồ đạc: 28m
-                if (entry.Type == 2 && dist > 60f) continue;  // Đồng đội: 60m
+                // Giới hạn khoảng cách tối ưu tránh rối mắt
+                if (entry.Type == 0 && dist > 65f) continue;
+                if (entry.Type == 1 && dist > 28f) continue;
+                if (entry.Type == 2 && dist > 75f) continue;
+                if (entry.Type == 3 && dist > 140f) continue;
+                if (entry.Type == 4 && dist > 40f) continue;
+                if (entry.Type == 5 && dist > 90f) continue;
+                if (entry.Type == 6 && dist > 60f) continue;
 
-                Vector3 screenPos = cam.WorldToScreenPoint(targetPos);
-                if (screenPos.z <= 0.1f) continue; // Phía sau camera
-
-                float screenY = Screen.height - screenPos.y;
-                float screenX = screenPos.x;
-
-                if (screenX < -60 || screenX > Screen.width + 60 || screenY < -60 || screenY > Screen.height + 60)
-                    continue;
-
-                string label;
-                GUIStyle style;
-                switch (entry.Type)
+                // NHÓM 1: Hộp Chữ Nhật 3D (Quái vật, Đồ giá trị, Đồng đội, Extractor)
+                if (entry.Type == 0 || entry.Type == 1 || entry.Type == 2 || entry.Type == 3)
                 {
-                    case 0:
-                        if (entry.EnemyHealth != null)
+                    Quaternion rot = entry.Transform.rotation;
+                    Vector3 boxCenter = basePos + rot * entry.CenterOffset;
+                    Vector3 ext = entry.Extents;
+
+                    Color boxCol;
+                    string label;
+                    GUIStyle style;
+
+                    switch (entry.Type)
+                    {
+                        case 0:
+                            if (entry.EnemyHealth != null)
+                            {
+                                bool isDead = FieldEhDead != null ? (bool)FieldEhDead.GetValue(entry.EnemyHealth) : false;
+                                if (isDead) continue;
+                                int curHp = FieldEhHealthCurrent != null ? (int)FieldEhHealthCurrent.GetValue(entry.EnemyHealth) : 0;
+                                if (curHp <= 0) continue;
+                                entry.ExtraInfo = $"{curHp} HP";
+                            }
+                            boxCol = new Color(1f, 0.22f, 0.22f, 0.85f);
+                            label = string.IsNullOrEmpty(entry.ExtraInfo) ? $"[👹 {entry.Name}] ({dist:0}m)" : $"[👹 {entry.Name} - {entry.ExtraInfo}] ({dist:0}m)";
+                            style = espEnemyStyle;
+                            break;
+                        case 1:
+                            boxCol = new Color(1f, 0.85f, 0.15f, 0.85f);
+                            label = !string.IsNullOrEmpty(entry.ExtraInfo) ? $"[{entry.ExtraInfo}] ({dist:0}m)" : $"[💎] ({dist:0}m)";
+                            style = espValuableStyle;
+                            break;
+                        case 2:
+                            boxCol = new Color(0.2f, 0.85f, 1f, 0.85f);
+                            label = $"[🧑 {entry.Name}] ({dist:0}m)";
+                            style = espPlayerStyle;
+                            break;
+                        default:
+                            boxCol = new Color(0.25f, 1f, 0.45f, 0.90f);
+                            label = $"[🚀 EXTRACTOR - TRẠM RÚT] ({dist:0}m)";
+                            style = espExtractorStyle;
+                            break;
+                    }
+
+                    // Vẽ khung hộp 3D
+                    bool drawn = Draw3DBox(cam, boxCenter, ext, rot, boxCol, 1.5f);
+
+                    // Vẽ nhãn ở đỉnh hộp 3D
+                    Vector3 topWorld = boxCenter + rot * (Vector3.up * ext.y);
+                    Vector3 topScreen = cam.WorldToScreenPoint(topWorld);
+                    if (topScreen.z > 0.1f)
+                    {
+                        float lx = topScreen.x;
+                        float ly = Screen.height - topScreen.y - 10f;
+                        if (lx >= -60 && lx <= Screen.width + 60 && ly >= -60 && ly <= Screen.height + 60)
                         {
-                            bool isDead = FieldEhDead != null ? (bool)FieldEhDead.GetValue(entry.EnemyHealth) : false;
-                            if (isDead) continue;
-                            int curHp = FieldEhHealthCurrent != null ? (int)FieldEhHealthCurrent.GetValue(entry.EnemyHealth) : 0;
-                            if (curHp <= 0) continue;
-                            entry.ExtraInfo = $"{curHp} HP";
+                            Vector2 size = style.CalcSize(new GUIContent(label));
+                            Rect boxRect = new Rect(lx - (size.x / 2f) - 3, ly - (size.y / 2f) - 1, size.x + 6, size.y + 2);
+                            GUI.Box(boxRect, GUIContent.none, espBackgroundBoxStyle);
+                            GUI.Label(boxRect, label, style);
                         }
-
-                        label = string.IsNullOrEmpty(entry.ExtraInfo)
-                            ? $"[👹 {entry.Name}] ({dist:0}m)"
-                            : $"[👹 {entry.Name} - {entry.ExtraInfo}] ({dist:0}m)";
-                        style = espEnemyStyle;
-                        break;
-                    case 1:
-                        // Đồ đạc CHỈ hiện giá tiền + độ nặng màu vàng
-                        label = !string.IsNullOrEmpty(entry.ExtraInfo)
-                            ? $"[{entry.ExtraInfo}] ({dist:0}m)"
-                            : $"[💎] ({dist:0}m)";
-                        style = espValuableStyle;
-                        break;
-                    case 2:
-                        label = $"[🧑 {entry.Name}] ({dist:0}m)";
-                        style = espPlayerStyle;
-                        break;
-                    default:
-                        continue;
+                    }
                 }
+                else
+                {
+                    // NHÓM 2: Dấu Chấm Màu & Mũi Tên Nhỏ Gọn (Item rơi, Đầu chết, Xe đẩy)
+                    Vector3 screenPos = cam.WorldToScreenPoint(basePos + Vector3.up * 0.35f);
+                    if (screenPos.z <= 0.1f) continue;
 
-                Vector2 size = style.CalcSize(new GUIContent(label));
-                Rect boxRect = new Rect(screenX - (size.x / 2f) - 3, screenY - (size.y / 2f) - 1, size.x + 6, size.y + 2);
+                    float screenX = screenPos.x;
+                    float screenY = Screen.height - screenPos.y;
+                    if (screenX < -60 || screenX > Screen.width + 60 || screenY < -60 || screenY > Screen.height + 60)
+                        continue;
 
-                GUI.Box(boxRect, GUIContent.none, espBackgroundBoxStyle);
-                GUI.Label(boxRect, label, style);
+                    string label;
+                    GUIStyle style;
+
+                    switch (entry.Type)
+                    {
+                        case 4:
+                            label = $"🟣 {entry.Name} ({dist:0}m)";
+                            style = espDroppedItemStyle;
+                            break;
+                        case 5:
+                            label = $"💀 CỨU ĐỒNG ĐỘI ({dist:0}m)";
+                            style = espDeadHeadStyle;
+                            break;
+                        case 6:
+                            label = $"🛒 Xe Đẩy ({dist:0}m)";
+                            style = espCartStyle;
+                            break;
+                        default:
+                            continue;
+                    }
+
+                    Vector2 size = style.CalcSize(new GUIContent(label));
+                    Rect boxRect = new Rect(screenX - (size.x / 2f) - 3, screenY - (size.y / 2f) - 1, size.x + 6, size.y + 2);
+                    GUI.Box(boxRect, GUIContent.none, espBackgroundBoxStyle);
+                    GUI.Label(boxRect, label, style);
+                }
             }
         }
 
