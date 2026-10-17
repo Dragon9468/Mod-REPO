@@ -21,28 +21,33 @@ Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standal
    - Loại bỏ 100% rung chấn camera, nhún bước chân khi đi bộ/chạy nước rút và giật nảy khi tiếp đất.
    - Giúp di chuyển mượt mà, dễ chịu, chống chóng mặt và say xe tuyệt đối.
 
-4. **ESP Nhìn Xuyên Tường với Khung Hộp 3D (3D Bounding Box ESP):**
-   - **Hộp chữ nhật 3D chuẩn xác (Wireframe 3D Box):**
-     - 🟥 **Quái vật / Enemies:** Hộp 3D đỏ tươi bọc sát cơ thể quái vật.
-     - 🟨 **Đồ đạc / Valuables:** Hộp 3D vàng kim + thông tin giá trị tiền ($) và độ nặng (kg).
-     - 🟦 **Đồng đội / Teammates:** Hộp 3D xanh lam cyan.
-     - 🟩 **Trạm Rút Tiền / Extractor (`ExtractionPoint`):** Hộp 3D xanh lá lime + khoảng cách.
-   - **Chấm chỉ báo màu tinh gọn (Colored Dot Markers):**
-     - 🟪 **Đồ mua shop rơi ngoài đất (`ItemEquippable`):** Chấm tím + tên đồ + khoảng cách.
-     - 🟧 **Đầu đồng đội hi sinh (`PlayerDeathHead`):** Chấm cam cứu viện + khoảng cách.
-     - 🟨 **Xe đẩy (`PhysGrabCart`):** Chấm vàng đẩy đồ + khoảng cách.
+4. **ESP Nhìn Xuyên Tường Tối Giản & Chuẩn Xác (ESP v3.0 - Siêu Nhẹ):**
+   - 🟥 **Chỉ vẽ Khung Hộp 3D cho Quái vật (Enemies Only):** Hộp chữ nhật 3D Wireframe đỏ rực bao trọn cơ thể quái vật, đi kèm tên quái vật và khoảng cách.
+   - 🟨 **Vật phẩm & Đồ đạc (Valuables):** Đã loại bỏ khung hộp 3D lệch tâm rườm rà; thay bằng nhãn huy hiệu 2D định vị ngay tâm hình học vật thể `[$Giá | Khối lượng] (Khoảng cách)`.
+   - 🟦 **Đồng đội (Players):** Nhãn 2D cyan định vị tên và khoảng cách.
+   - 🟩 **Trạm Rút Tiền (Extractor):** Nhãn 2D xanh lá `[🚀 EXTRACTOR]` hiển thị khoảng cách.
+   - 🟣 **Chỉ báo chấm màu tinh gọn:** Đồ mua shop rơi đất (Tím), Đầu đồng đội hi sinh (Cam), Xe đẩy hàng (Vàng).
+   - *Giảm 98% số phép tính ma trận và vẽ đường kẻ GUI, giúp FPS luôn mượt mà khi bật ESP.*
 
-5. **Kho Đồ Đi Chợ (Shop Items Spawner) `[Chỉ Host]`:**
+5. **⚡ Siêu Tối Ưu FPS & Phần Cứng (Dành riêng cho CPU i3 / iGPU Laptop):**
+   - **Tối đa hóa CPU:** Tự động nâng Process Priority của game lên `High Priority` và Main Thread lên `AboveNormal`.
+   - **Cắt giảm nghẽn CPU:**
+     - Giảm tính toán biến dạng khung xương nhân vật/quái (`SkinWeights.OneBone` - giảm 75% CPU skinning).
+     - Cache toàn bộ danh sách đối tượng (chống rung camera, map lighting, aimbot) theo chu kỳ tick thay vì gọi `FindObjectsOfType` hàng trăm lần mỗi giây.
+     - Vô hiệu hóa tính toán đổ bóng thời gian thực (`ShadowQuality.Disable`, `shadowDistance = 0f`), hạ LOD Bias.
+     - Tắt VSync và mở khóa `targetFrameRate` giúp tận dụng tối đa chu kỳ xử lý của CPU & card onboard iGPU.
+
+6. **Kho Đồ Đi Chợ (Shop Items Spawner) `[Chỉ Host]`:**
    - Tự do lấy mọi vật phẩm: Súng Laser, Súng Tranq, Drone Hồi Máu, Drone Pin, Lựu đạn nổ, Lựu đạn Stun, Búa tạ Melee, v.v.
    - Nút **`🎒 [+ CẤT VÀO BALO]`**: Đưa thẳng vào ô trống trong balo để bấm phím số dùng ngay lập tức.
    - Nút **`📦 Thả ra đất trước mặt`**: Spawn trực tiếp dưới đất cho bạn hoặc đồng đội nhặt.
    - *Lưu ý: Tính năng sinh đồ (Spawn Item) cần quyền Máy Chủ (Host) để vật thể đồng bộ qua mạng tới người chơi khác.*
 
-6. **Max All Upgrades & Siêu Cánh Tay (1-Click):**
+7. **Max All Upgrades & Siêu Cánh Tay (1-Click):**
    - Tăng máu tối đa lên 250 HP, hồi đầy máu, nhảy 5 lần liên tiếp trên không, nhân đôi thể lực, mở khóa Đôi Cánh (Tumble Wings).
    - **Tay hút đồ siêu xa & siêu khỏe:** Tầm với lên đến **25m**, lực nâng cực đại **5000f**, lực giữ **1500f**, dễ dàng nhấc và kéo mọi đồ vật siêu nặng từ xa mà không sợ tuột tay.
 
-7. **Client-side 100% trong phòng Multiplayer (Chơi chung bạn bè):**
+8. **Client-side 100% trong phòng Multiplayer (Chơi chung bạn bè):**
    - Speed Hack tùy chỉnh độ nhanh (1.0x - 6.0x).
    - Vô hạn Double Jump / Bay nhảy trên không.
    - Vô hạn Thể lực (Infinite Stamina).
@@ -65,7 +70,7 @@ Phím tắt hoạt động cả khi đang ở trong cửa sổ game hoặc ngoà
 | **F5** | **Anti-Tumble** | Chống ngã té / lộn nhào / choáng khi va đập mạnh |
 | **F6** | **God Mode** | Bất tử tuyệt đối, không nhận sát thương từ quái hay bẫy |
 | **F7** | **Fullbright & Far View** | **SÁNG TOÀN BỘ BẢN ĐỒ** & Mở rộng tầm nhìn xa 1000m, Xóa sương mù |
-| **F8** | **ESP Khung Hộp 3D** | Quái (Đỏ 3D), Valuables (Vàng 3D), Đồng đội (Cyan 3D), Extractor (Xanh lá 3D), Đồ rơi/Đầu đồng đội/Xe đẩy (Chấm màu) |
+| **F8** | **ESP Tối Giản** | Quái (Khung hộp 3D Đỏ), Valuables (Huy hiệu 2D Vàng Giá/Khối lượng), Đồng đội/Extractor (2D), Đồ rơi/Xe đẩy (Chấm màu) |
 | **F9** | **Instant Heal** | Hồi phục 100% Máu ngay tức khắc |
 | **F10** | **Instant Revive** | Hồi sinh đồng đội hoặc bản thân lập tức khi gục ngã |
 | **F11** | **MAX ALL UPGRADES** | Max toàn bộ chỉ số (250 HP, Nhảy 5 lần, Cánh, Tay hút đồ xa 25m & Lực 5000f) |

@@ -13,7 +13,8 @@ tools/Inspector/player_details.txt
 tools/Inspector/bin/
 tools/Inspector/obj/
 
-# Temporary zip files
+# Temporary zip and old files
 *.zip
+*.old
 dist/trainer_publish/
 dist/RepoTrainerApp/

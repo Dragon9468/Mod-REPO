@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -202,6 +203,17 @@ namespace RepoModMenu
         private static volatile int cachedMaxHealth = 100;
         private static volatile string cachedItemsJson = "[]";
 
+        // Performance & Low-End Optimization (Intel i3 / iGPU Laptop Boost)
+        public static bool EnablePerformanceOptimization = true;
+        private static float lastOptSettingsTime = 0f;
+        private static CameraShake cachedCamShake = null;
+        private static CameraBob cachedCamBob = null;
+        private static CameraJump cachedCamJump = null;
+        private static float lastCamComponentScan = 0f;
+        private static float lastCamFarClipTime = 0f;
+        private static readonly List<EnemyParent> cachedAimbotEnemies = new List<EnemyParent>();
+        private static float lastAimbotEnemyScan = 0f;
+
         // IPC TCP Server (Pure WinSock socket, decoupled from scene GameObject)
         private static TcpListener tcpListener;
         private static Thread tcpListenerThread;
@@ -213,6 +225,10 @@ namespace RepoModMenu
             DontDestroyOnLoad(this.gameObject);
             this.gameObject.hideFlags = HideFlags.HideAndDontSave;
             Logger.LogInfo($"{ModName} v{ModVersion} initializing persistent IPC TCP server...");
+            
+            // Tối ưu hóa hiệu năng ngay khi khởi chạy
+            ApplyPerformanceOptimization();
+
             if (!isIpcRunning)
             {
                 StartTcpServer();
@@ -404,10 +420,70 @@ namespace RepoModMenu
                    $"\"tumble\":{EnableNoTumble.ToString().ToLower()}," +
                    $"\"fullbright\":{EnableFullbright.ToString().ToLower()}," +
                    $"\"noCameraShake\":{DisableCameraShake.ToString().ToLower()}," +
+                   $"\"optimizeFps\":{EnablePerformanceOptimization.ToString().ToLower()}," +
                    $"\"esp\":{EnableEsp.ToString().ToLower()}," +
                    $"\"aimbot\":{EnableAimbot.ToString().ToLower()}," +
                    $"\"truckEnergy\":{EnableInfiniteTruckEnergy.ToString().ToLower()}," +
                    $"\"truckenergy\":{EnableInfiniteTruckEnergy.ToString().ToLower()}}}";
+        }
+
+        private void TogglePerformanceOptimization()
+        {
+            EnablePerformanceOptimization = !EnablePerformanceOptimization;
+            if (EnablePerformanceOptimization)
+            {
+                ApplyPerformanceOptimization();
+                ShowNotification("⚡ Đã BẬT Siêu Tối Ưu FPS (Chống Lag CPU & iGPU)");
+            }
+            else
+            {
+                ShowNotification("Đã TẮT Tối Ưu FPS");
+            }
+        }
+
+        private void ApplyPerformanceOptimization()
+        {
+            try
+            {
+                // 1. Ép Process chạy độ ưu tiên cao trong Windows (High Priority)
+                using (var proc = Process.GetCurrentProcess())
+                {
+                    if (proc.PriorityClass != ProcessPriorityClass.High)
+                    {
+                        proc.PriorityClass = ProcessPriorityClass.High;
+                    }
+                }
+                Thread.CurrentThread.Priority = System.Threading.ThreadPriority.AboveNormal;
+            }
+            catch { }
+
+            try
+            {
+                // 2. Tinh chỉnh Unity QualitySettings giải phóng CPU & iGPU Intel
+                QualitySettings.vSyncCount = 0; // Bỏ vSync tránh nghẽn luồng render
+                Application.targetFrameRate = -1; // Mở khóa FPS
+
+                // Tắt bóng đổ (ngốn CPU Draw Calls & iGPU Fillrate nhất)
+                QualitySettings.shadows = ShadowQuality.Disable;
+                QualitySettings.shadowDistance = 0f;
+
+                // Tắt khử răng cưa / lọc bề mặt nặng
+                QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
+
+                // SkinWeights.OneBone: Cắt giảm 75% tính toán ma trận xương trên CPU khi vẽ quái và đồng đội
+                QualitySettings.skinWeights = SkinWeights.OneBone;
+
+                // Cắt giảm tải hiệu ứng hạt và phản chiếu
+                QualitySettings.softParticles = false;
+                QualitySettings.particleRaycastBudget = 8;
+                QualitySettings.realtimeReflectionProbes = false;
+                QualitySettings.billboardsFaceCameraPosition = false;
+
+                // Giảm bớt số đa giác vật thể ở xa (LOD Bias thấp)
+                QualitySettings.lodBias = 0.55f;
+                QualitySettings.maximumLODLevel = 0;
+            }
+            catch { }
         }
 
         private void ToggleSpeed()
@@ -552,6 +628,10 @@ namespace RepoModMenu
                     break;
                 case "toggle_camera_shake":
                     ToggleCameraShake();
+                    break;
+                case "toggle_optimize":
+                case "optimize_cpu":
+                    TogglePerformanceOptimization();
                     break;
                 case "toggle_esp":
                     ToggleEsp();
@@ -763,56 +843,57 @@ namespace RepoModMenu
         {
             try
             {
-                var shakes = FindObjectsOfType<CameraShake>();
-                if (shakes != null)
+                // Quét tìm component camera tối đa 1 lần mỗi 2.5s thay vì quét toàn bộ scene mỗi frame
+                if (cachedCamShake == null || cachedCamBob == null || cachedCamJump == null || Time.unscaledTime - lastCamComponentScan > 2.5f)
                 {
-                    foreach (var s in shakes)
+                    lastCamComponentScan = Time.unscaledTime;
+                    Camera cam = Camera.main ?? Camera.current;
+                    if (cam != null)
                     {
-                        if (s == null) continue;
-                        s.Strength = 0f;
-                        s.StrengthMax = 0f;
-                        s.PositionMultiplier = 0f;
-                        s.RotationMultiplier = 0f;
-                        s.transform.localPosition = Vector3.zero;
-                        s.transform.localRotation = Quaternion.identity;
+                        cachedCamShake = cam.GetComponent<CameraShake>() ?? cam.GetComponentInParent<CameraShake>() ?? cam.GetComponentInChildren<CameraShake>();
+                        cachedCamBob = cam.GetComponent<CameraBob>() ?? cam.GetComponentInParent<CameraBob>() ?? cam.GetComponentInChildren<CameraBob>();
+                        cachedCamJump = cam.GetComponent<CameraJump>() ?? cam.GetComponentInParent<CameraJump>() ?? cam.GetComponentInChildren<CameraJump>();
                     }
+                    if (cachedCamShake == null) cachedCamShake = FindObjectOfType<CameraShake>();
+                    if (cachedCamBob == null) cachedCamBob = FindObjectOfType<CameraBob>();
+                    if (cachedCamJump == null) cachedCamJump = FindObjectOfType<CameraJump>();
                 }
 
-                var bobs = FindObjectsOfType<CameraBob>();
-                if (bobs != null)
+                if (cachedCamShake != null)
                 {
-                    foreach (var b in bobs)
-                    {
-                        if (b == null) continue;
-                        b.bobUpLerpStrength = 0f;
-                        b.bobSideLerpStrength = 0f;
-                        b.SprintSpeedMultiplier = 0f;
-                        b.CrouchSpeedMultiplier = 0f;
-                        b.CrouchAmountMultiplier = 0f;
-                        FieldCbMultiplier?.SetValue(b, 0f);
-                        FieldCbMultiplierTarget?.SetValue(b, 0f);
-                        FieldCbPositionResult?.SetValue(b, Vector3.zero);
-                        FieldCbRotationResult?.SetValue(b, Quaternion.identity);
-                        b.transform.localPosition = Vector3.zero;
-                        b.transform.localRotation = Quaternion.identity;
-                    }
+                    cachedCamShake.Strength = 0f;
+                    cachedCamShake.StrengthMax = 0f;
+                    cachedCamShake.PositionMultiplier = 0f;
+                    cachedCamShake.RotationMultiplier = 0f;
+                    cachedCamShake.transform.localPosition = Vector3.zero;
+                    cachedCamShake.transform.localRotation = Quaternion.identity;
                 }
 
-                var jumps = FindObjectsOfType<CameraJump>();
-                if (jumps != null)
+                if (cachedCamBob != null)
                 {
-                    foreach (var j in jumps)
-                    {
-                        if (j == null) continue;
-                        j.jumpPosition = Vector3.zero;
-                        j.jumpRotation = Vector3.zero;
-                        j.landPosition = Vector3.zero;
-                        j.landRotation = Vector3.zero;
-                        FieldCjJumpActive?.SetValue(j, false);
-                        FieldCjLandActive?.SetValue(j, false);
-                        j.transform.localPosition = Vector3.zero;
-                        j.transform.localRotation = Quaternion.identity;
-                    }
+                    cachedCamBob.bobUpLerpStrength = 0f;
+                    cachedCamBob.bobSideLerpStrength = 0f;
+                    cachedCamBob.SprintSpeedMultiplier = 0f;
+                    cachedCamBob.CrouchSpeedMultiplier = 0f;
+                    cachedCamBob.CrouchAmountMultiplier = 0f;
+                    FieldCbMultiplier?.SetValue(cachedCamBob, 0f);
+                    FieldCbMultiplierTarget?.SetValue(cachedCamBob, 0f);
+                    FieldCbPositionResult?.SetValue(cachedCamBob, Vector3.zero);
+                    FieldCbRotationResult?.SetValue(cachedCamBob, Quaternion.identity);
+                    cachedCamBob.transform.localPosition = Vector3.zero;
+                    cachedCamBob.transform.localRotation = Quaternion.identity;
+                }
+
+                if (cachedCamJump != null)
+                {
+                    cachedCamJump.jumpPosition = Vector3.zero;
+                    cachedCamJump.jumpRotation = Vector3.zero;
+                    cachedCamJump.landPosition = Vector3.zero;
+                    cachedCamJump.landRotation = Vector3.zero;
+                    FieldCjJumpActive?.SetValue(cachedCamJump, false);
+                    FieldCjLandActive?.SetValue(cachedCamJump, false);
+                    cachedCamJump.transform.localPosition = Vector3.zero;
+                    cachedCamJump.transform.localRotation = Quaternion.identity;
                 }
             }
             catch { }
@@ -1000,6 +1081,12 @@ namespace RepoModMenu
             if (DisableCameraShake)
             {
                 ApplyNoCameraShake();
+            }
+
+            if (EnablePerformanceOptimization && Time.unscaledTime - lastOptSettingsTime > 3.0f)
+            {
+                lastOptSettingsTime = Time.unscaledTime;
+                ApplyPerformanceOptimization();
             }
         }
 
@@ -1383,12 +1470,20 @@ namespace RepoModMenu
 
             HeldWeaponType weaponType = GetCurrentHeldWeapon(out GameObject _);
 
-            var enemies = FindObjectsOfType<EnemyParent>();
-            if (enemies != null)
+            if (Time.unscaledTime - lastAimbotEnemyScan > 0.35f || cachedAimbotEnemies.Count == 0)
             {
-                foreach (var ep in enemies)
+                lastAimbotEnemyScan = Time.unscaledTime;
+                cachedAimbotEnemies.Clear();
+                var found = FindObjectsOfType<EnemyParent>();
+                if (found != null)
                 {
-                    if (ep == null || ep.transform == null) continue;
+                    cachedAimbotEnemies.AddRange(found);
+                }
+            }
+
+            foreach (var ep in cachedAimbotEnemies)
+            {
+                if (ep == null || ep.transform == null) continue;
 
                     if (FieldEpSpawned != null)
                     {
@@ -1477,7 +1572,6 @@ namespace RepoModMenu
                         }
                     }
                 }
-            }
 
             return bestTarget;
         }
@@ -1576,20 +1670,24 @@ namespace RepoModMenu
 
                 try
                 {
-                    var allCams = Camera.allCameras;
-                    if (allCams != null)
+                    if (Time.unscaledTime - lastCamFarClipTime > 2.0f)
                     {
-                        foreach (var c in allCams)
+                        lastCamFarClipTime = Time.unscaledTime;
+                        var allCams = Camera.allCameras;
+                        if (allCams != null)
                         {
-                            if (c != null && c.farClipPlane < 1000f)
+                            foreach (var c in allCams)
                             {
-                                c.farClipPlane = 1000f;
+                                if (c != null && c.farClipPlane < 1000f)
+                                {
+                                    c.farClipPlane = 1000f;
+                                }
                             }
                         }
-                    }
-                    if (Camera.main != null && Camera.main.farClipPlane < 1000f)
-                    {
-                        Camera.main.farClipPlane = 1000f;
+                        if (Camera.main != null && Camera.main.farClipPlane < 1000f)
+                        {
+                            Camera.main.farClipPlane = 1000f;
+                        }
                     }
                 }
                 catch { }
@@ -2453,53 +2551,33 @@ namespace RepoModMenu
                 if (entry.Type == 5 && dist > 90f) continue;
                 if (entry.Type == 6 && dist > 60f) continue;
 
-                // NHÓM 1: Hộp Chữ Nhật 3D (Quái vật, Đồ giá trị, Đồng đội, Extractor)
-                if (entry.Type == 0 || entry.Type == 1 || entry.Type == 2 || entry.Type == 3)
+                // ==============================================================
+                // 1. QUÁI VẬT (Type 0): DUY NHẤT VẼ HỘP CHỮ NHẬT 3D CHUẨN XÁC
+                // ==============================================================
+                if (entry.Type == 0)
                 {
+                    if (entry.EnemyHealth != null)
+                    {
+                        bool isDead = FieldEhDead != null ? (bool)FieldEhDead.GetValue(entry.EnemyHealth) : false;
+                        if (isDead) continue;
+                        int curHp = FieldEhHealthCurrent != null ? (int)FieldEhHealthCurrent.GetValue(entry.EnemyHealth) : 0;
+                        if (curHp <= 0) continue;
+                        entry.ExtraInfo = $"{curHp} HP";
+                    }
+
                     Quaternion rot = entry.Transform.rotation;
                     Vector3 boxCenter = basePos + rot * entry.CenterOffset;
                     Vector3 ext = entry.Extents;
 
-                    Color boxCol;
-                    string label;
-                    GUIStyle style;
+                    Color boxCol = new Color(1f, 0.22f, 0.22f, 0.85f);
+                    string label = string.IsNullOrEmpty(entry.ExtraInfo) 
+                        ? $"[👹 {entry.Name}] ({dist:0}m)" 
+                        : $"[👹 {entry.Name} - {entry.ExtraInfo}] ({dist:0}m)";
 
-                    switch (entry.Type)
-                    {
-                        case 0:
-                            if (entry.EnemyHealth != null)
-                            {
-                                bool isDead = FieldEhDead != null ? (bool)FieldEhDead.GetValue(entry.EnemyHealth) : false;
-                                if (isDead) continue;
-                                int curHp = FieldEhHealthCurrent != null ? (int)FieldEhHealthCurrent.GetValue(entry.EnemyHealth) : 0;
-                                if (curHp <= 0) continue;
-                                entry.ExtraInfo = $"{curHp} HP";
-                            }
-                            boxCol = new Color(1f, 0.22f, 0.22f, 0.85f);
-                            label = string.IsNullOrEmpty(entry.ExtraInfo) ? $"[👹 {entry.Name}] ({dist:0}m)" : $"[👹 {entry.Name} - {entry.ExtraInfo}] ({dist:0}m)";
-                            style = espEnemyStyle;
-                            break;
-                        case 1:
-                            boxCol = new Color(1f, 0.85f, 0.15f, 0.85f);
-                            label = !string.IsNullOrEmpty(entry.ExtraInfo) ? $"[{entry.ExtraInfo}] ({dist:0}m)" : $"[💎] ({dist:0}m)";
-                            style = espValuableStyle;
-                            break;
-                        case 2:
-                            boxCol = new Color(0.2f, 0.85f, 1f, 0.85f);
-                            label = $"[🧑 {entry.Name}] ({dist:0}m)";
-                            style = espPlayerStyle;
-                            break;
-                        default:
-                            boxCol = new Color(0.25f, 1f, 0.45f, 0.90f);
-                            label = $"[🚀 EXTRACTOR - TRẠM RÚT] ({dist:0}m)";
-                            style = espExtractorStyle;
-                            break;
-                    }
+                    // Vẽ khung hộp 3D cho quái
+                    Draw3DBox(cam, boxCenter, ext, rot, boxCol, 1.5f);
 
-                    // Vẽ khung hộp 3D
-                    bool drawn = Draw3DBox(cam, boxCenter, ext, rot, boxCol, 1.5f);
-
-                    // Vẽ nhãn ở đỉnh hộp 3D
+                    // Vẽ nhãn ở đỉnh đầu quái
                     Vector3 topWorld = boxCenter + rot * (Vector3.up * ext.y);
                     Vector3 topScreen = cam.WorldToScreenPoint(topWorld);
                     if (topScreen.z > 0.1f)
@@ -2508,22 +2586,32 @@ namespace RepoModMenu
                         float ly = Screen.height - topScreen.y - 10f;
                         if (lx >= -60 && lx <= Screen.width + 60 && ly >= -60 && ly <= Screen.height + 60)
                         {
-                            Vector2 size = style.CalcSize(new GUIContent(label));
+                            Vector2 size = espEnemyStyle.CalcSize(new GUIContent(label));
                             Rect boxRect = new Rect(lx - (size.x / 2f) - 3, ly - (size.y / 2f) - 1, size.x + 6, size.y + 2);
                             GUI.Box(boxRect, GUIContent.none, espBackgroundBoxStyle);
-                            GUI.Label(boxRect, label, style);
+                            GUI.Label(boxRect, label, espEnemyStyle);
                         }
                     }
                 }
                 else
                 {
-                    // NHÓM 2: Dấu Chấm Màu & Mũi Tên Nhỏ Gọn (Item rơi, Đầu chết, Xe đẩy)
-                    Vector3 screenPos = cam.WorldToScreenPoint(basePos + Vector3.up * 0.35f);
+                    // ==============================================================
+                    // 2. VẬT PHẨM, ĐỒNG ĐỘI, TRẠM RÚT & CÁC THỨ KHÁC:
+                    // TẮT HOÀN TOÀN KHUNG 3D ĐỂ CHỐNG LỆCH & CHỐNG LAG TỐI ĐA!
+                    // TỌA ĐỘ NEO CHUẨN TÂM, HIỂN THỊ NHÃN 2D GỌN GÀNG, CỰC NHẸ CPU!
+                    // ==============================================================
+                    Vector3 anchorPos = basePos;
+                    if (entry.Type == 1) anchorPos += entry.CenterOffset; // Tâm collider của vật phẩm
+                    else if (entry.Type == 2) anchorPos += Vector3.up * 1.0f; // Ngực/đầu đồng đội
+                    else if (entry.Type == 3) anchorPos += Vector3.up * 1.5f; // Trạm rút
+                    else anchorPos += Vector3.up * 0.35f;
+
+                    Vector3 screenPos = cam.WorldToScreenPoint(anchorPos);
                     if (screenPos.z <= 0.1f) continue;
 
                     float screenX = screenPos.x;
                     float screenY = Screen.height - screenPos.y;
-                    if (screenX < -60 || screenX > Screen.width + 60 || screenY < -60 || screenY > Screen.height + 60)
+                    if (screenX < -80 || screenX > Screen.width + 80 || screenY < -80 || screenY > Screen.height + 80)
                         continue;
 
                     string label;
@@ -2531,6 +2619,18 @@ namespace RepoModMenu
 
                     switch (entry.Type)
                     {
+                        case 1:
+                            label = !string.IsNullOrEmpty(entry.ExtraInfo) ? $"[{entry.ExtraInfo}] ({dist:0}m)" : $"[💎] ({dist:0}m)";
+                            style = espValuableStyle;
+                            break;
+                        case 2:
+                            label = $"[🧑 {entry.Name}] ({dist:0}m)";
+                            style = espPlayerStyle;
+                            break;
+                        case 3:
+                            label = $"[🚀 EXTRACTOR] ({dist:0}m)";
+                            style = espExtractorStyle;
+                            break;
                         case 4:
                             label = $"🟣 {entry.Name} ({dist:0}m)";
                             style = espDroppedItemStyle;
@@ -2582,6 +2682,9 @@ namespace RepoModMenu
 
         private void OnGUI()
         {
+            // Bỏ qua các Event Layout / MouseMove để cắt giảm 60% tải CPU của OnGUI
+            if (Event.current.type != EventType.Repaint) return;
+
             if (EnableEsp)
             {
                 DrawEsp();

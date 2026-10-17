@@ -32,6 +32,7 @@ namespace RepoTrainerApp
         private CheckBox chkGod;
         private CheckBox chkFullbright;
         private CheckBox chkNoCameraShake;
+        private CheckBox chkOptimizeFps;
         private CheckBox chkEsp;
         private CheckBox chkAimbot;
 
@@ -322,15 +323,27 @@ namespace RepoTrainerApp
 
             chkNoCameraShake = new CheckBox
             {
-                Text = "🚫 Tắt rung lắc camera (Chống chóng mặt)",
+                Text = "🚫 Tắt rung lắc camera",
                 Location = new Point(15, 126),
-                Size = new Size(320, 25),
+                Size = new Size(240, 25),
                 Font = itemFont,
                 ForeColor = Color.LightPink,
                 Checked = true
             };
             chkNoCameraShake.Click += async (s, e) => await SendCommand("toggle_camera_shake");
             gbMovement.Controls.Add(chkNoCameraShake);
+
+            chkOptimizeFps = new CheckBox
+            {
+                Text = "⚡ Siêu Tối Ưu FPS (i3/iGPU)",
+                Location = new Point(275, 126),
+                Size = new Size(255, 25),
+                Font = itemFont,
+                ForeColor = Color.LightSkyBlue,
+                Checked = true
+            };
+            chkOptimizeFps.Click += async (s, e) => await SendCommand("toggle_optimize");
+            gbMovement.Controls.Add(chkOptimizeFps);
 
             this.Controls.Add(gbMovement);
             currentY += 170;
@@ -694,6 +707,7 @@ namespace RepoTrainerApp
                     chkTumble.Checked = res.Contains("\"tumble\":true");
                     chkFullbright.Checked = res.Contains("\"fullbright\":true");
                     chkNoCameraShake.Checked = res.Contains("\"noCameraShake\":true");
+                    chkOptimizeFps.Checked = res.Contains("\"optimizeFps\":true");
                     chkEsp.Checked = res.Contains("\"esp\":true");
                     chkAimbot.Checked = res.Contains("\"aimbot\":true");
                     chkTruckEnergy.Checked = res.Contains("\"truckenergy\":true");
