@@ -72,6 +72,16 @@ namespace RepoModMenu
 
         private static readonly FieldInfo FieldVoDollarValueCurrent = typeof(ValuableObject).GetField("dollarValueCurrent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private static readonly FieldInfo FieldVoRb = typeof(ValuableObject).GetField("rb", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly MethodInfo MethodVoGetCurrentCart = typeof(ValuableObject).GetMethod("GetCurrentCart", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldVoRoomVolumeCheck = typeof(ValuableObject).GetField("roomVolumeCheck", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldRvcInExtractionPoint = typeof(RoomVolumeCheck).GetField("inExtractionPoint", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly MethodInfo MethodRvcCheckSet = typeof(RoomVolumeCheck).GetMethod("CheckSet", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly FieldInfo FieldEpCurrentState = typeof(ExtractionPoint).GetField("currentState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldEpStateSetTo = typeof(ExtractionPoint).GetField("stateSetTo", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldEpIsCompletedRightAway = typeof(ExtractionPoint).GetField("isCompletedRightAway", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly FieldInfo FieldRdAllExtractionPointsCompleted = typeof(RoundDirector).GetField("allExtractionPointsCompleted", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
         private static readonly FieldInfo FieldPgGrabbedPhysGrabObject = typeof(PhysGrabber).GetField("grabbedPhysGrabObject", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         private static readonly FieldInfo FieldPaPlayerName = typeof(PlayerAvatar).GetField("playerName", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -213,6 +223,10 @@ namespace RepoModMenu
         private static float lastCamFarClipTime = 0f;
         private static readonly List<EnemyParent> cachedAimbotEnemies = new List<EnemyParent>();
         private static float lastAimbotEnemyScan = 0f;
+        private static float lastTerrainOptTime = 0f;
+        private static float lastSceneLightScan = 0f;
+        private static float lastParticleCleanTime = 0f;
+        private static float lastRamCleanTime = 0f;
 
         // IPC TCP Server (Pure WinSock socket, decoupled from scene GameObject)
         private static TcpListener tcpListener;
@@ -531,7 +545,17 @@ namespace RepoModMenu
             if (Time.unscaledTime - lastFullbrightTime < 0.35f) return;
             lastFullbrightTime = Time.unscaledTime;
             EnableFullbright = !EnableFullbright;
-            ShowNotification($"Fullbright: {(EnableFullbright ? "ON" : "OFF")}");
+            if (EnableFullbright)
+            {
+                ApplyTerrainAndSceneSimplification(true);
+                try { System.GC.Collect(); Resources.UnloadUnusedAssets(); } catch { }
+                ShowNotification("Sáng Toàn Map & Lược Giản Địa Hình (Siêu Tối Ưu CPU/RAM): BẬT");
+            }
+            else
+            {
+                ApplyTerrainAndSceneSimplification(false);
+                ShowNotification("Fullbright & Lược Giản Địa Hình: TẮT");
+            }
         }
 
         private void ToggleEsp()
@@ -1707,6 +1731,9 @@ namespace RepoModMenu
                     mapDirectionalLight.intensity = FullbrightIntensity;
                     mapDirectionalLight.enabled = true;
                 }
+
+                // Lược giản hóa địa hình và scene khi bật Fullbright để tối đa hóa CPU/RAM
+                ApplyTerrainAndSceneSimplification(true);
             }
             else
             {
@@ -1719,7 +1746,115 @@ namespace RepoModMenu
                     RenderSettings.fog = origFog;
                     RenderSettings.fogDensity = origFogDensity;
                 }
+                ApplyTerrainAndSceneSimplification(false);
             }
+        }
+
+        private void ApplyTerrainAndSceneSimplification(bool enable)
+        {
+            if (!enable)
+            {
+                try
+                {
+                    QualitySettings.maximumLODLevel = 0;
+                    QualitySettings.lodBias = 1.0f;
+                    var terrains = Terrain.activeTerrains;
+                    if (terrains != null)
+                    {
+                        foreach (var terrain in terrains)
+                        {
+                            if (terrain == null) continue;
+                            terrain.drawTreesAndFoliage = true;
+                            terrain.heightmapPixelError = 5f;
+                        }
+                    }
+                }
+                catch { }
+                return;
+            }
+
+            try
+            {
+                // 1. Ép toàn bộ LOD mô hình về mức đa giác thấp nhất
+                QualitySettings.maximumLODLevel = 1; // Bỏ qua LOD 0 độ phân giải cao
+                QualitySettings.lodBias = 0.35f;
+                QualitySettings.shadowDistance = 0f;
+                QualitySettings.shadows = ShadowQuality.Disable;
+                QualitySettings.realtimeReflectionProbes = false;
+                QualitySettings.softParticles = false;
+                QualitySettings.particleRaycastBudget = 4;
+
+                // 2. Lược giản địa hình (Unity Terrain)
+                if (Time.unscaledTime - lastTerrainOptTime > 3.0f)
+                {
+                    lastTerrainOptTime = Time.unscaledTime;
+                    var terrains = Terrain.activeTerrains;
+                    if (terrains != null)
+                    {
+                        foreach (var terrain in terrains)
+                        {
+                            if (terrain == null) continue;
+                            terrain.detailObjectDensity = 0f; // Triệt tiêu cỏ 3D
+                            terrain.detailObjectDistance = 0f;
+                            terrain.treeDistance = 0f;
+                            terrain.treeBillboardDistance = 0f;
+                            terrain.treeCrossFadeLength = 0f;
+                            terrain.treeMaximumFullLODCount = 0;
+                            terrain.heightmapPixelError = 150f; // Giảm tối đa lưới đa giác bề mặt địa hình
+                            terrain.basemapDistance = 40f;
+                            terrain.drawTreesAndFoliage = false; // Tắt tán cây rậm rạp
+                        }
+                    }
+                }
+
+                // 3. Tắt bóng và giảm tải các đèn cục bộ thừa thãi trong map
+                if (Time.unscaledTime - lastSceneLightScan > 3.5f)
+                {
+                    lastSceneLightScan = Time.unscaledTime;
+                    var allLights = FindObjectsOfType<Light>();
+                    if (allLights != null)
+                    {
+                        foreach (var l in allLights)
+                        {
+                            if (l == null) continue;
+                            if (mapDirectionalLight != null && l == mapDirectionalLight) continue;
+                            if (Camera.main != null && l.transform.IsChildOf(Camera.main.transform)) continue;
+                            if (l.GetComponentInParent<PlayerAvatar>() != null) continue;
+
+                            l.shadows = LightShadows.None;
+                            l.renderMode = LightRenderMode.ForceVertex;
+                        }
+                    }
+                }
+
+                // 4. Dọn dẹp Particle Systems môi trường gây nghẽn CPU
+                if (Time.unscaledTime - lastParticleCleanTime > 4.5f)
+                {
+                    lastParticleCleanTime = Time.unscaledTime;
+                    var allParticles = FindObjectsOfType<ParticleSystem>();
+                    if (allParticles != null)
+                    {
+                        foreach (var ps in allParticles)
+                        {
+                            if (ps == null) continue;
+                            if (ps.transform.GetComponentInParent<PlayerAvatar>() != null) continue;
+                            if (ps.transform.GetComponentInParent<Enemy>() != null) continue;
+                            if (ps.main.loop)
+                            {
+                                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                            }
+                        }
+                    }
+                }
+
+                // 5. Giải phóng RAM định kỳ
+                if (Time.unscaledTime - lastRamCleanTime > 12.0f)
+                {
+                    lastRamCleanTime = Time.unscaledTime;
+                    System.GC.Collect(0, GCCollectionMode.Optimized);
+                }
+            }
+            catch { }
         }
 
         private void RefreshItemsList()
@@ -2122,6 +2257,157 @@ namespace RepoModMenu
             return true;
         }
 
+        private static bool IsExtractorCompleted(ExtractionPoint ep)
+        {
+            if (ep == null) return true;
+            try
+            {
+                if (FieldEpCurrentState != null)
+                {
+                    int state = Convert.ToInt32(FieldEpCurrentState.GetValue(ep));
+                    if (state == 7) return true; // State.Complete
+                }
+                if (FieldEpStateSetTo != null)
+                {
+                    int state = Convert.ToInt32(FieldEpStateSetTo.GetValue(ep));
+                    if (state == 7) return true; // State.Complete
+                }
+                if (FieldEpIsCompletedRightAway != null && (bool)FieldEpIsCompletedRightAway.GetValue(ep))
+                {
+                    return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (RoundDirector.instance != null && FieldRdAllExtractionPointsCompleted != null)
+                {
+                    if ((bool)FieldRdAllExtractionPointsCompleted.GetValue(RoundDirector.instance))
+                        return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        private static bool IsValuableInCart(ValuableObject val, PhysGrabCart[] allCarts)
+        {
+            if (val == null) return false;
+            try
+            {
+                if (MethodVoGetCurrentCart != null)
+                {
+                    var cart = MethodVoGetCurrentCart.Invoke(val, null);
+                    if (cart != null) return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (val.transform.parent != null && val.transform.parent.GetComponentInParent<PhysGrabCart>() != null)
+                    return true;
+            }
+            catch { }
+
+            try
+            {
+                if (allCarts != null)
+                {
+                    Vector3 vPos = val.transform.position;
+                    foreach (var c in allCarts)
+                    {
+                        if (c == null) continue;
+                        Vector3 cPos = c.transform.position;
+                        float dist = Vector3.Distance(vPos, cPos);
+                        if (dist < 1.4f && Mathf.Abs(vPos.y - cPos.y) < 1.0f)
+                            return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        private static bool IsItemInCart(ItemEquippable ie, PhysGrabCart[] allCarts)
+        {
+            if (ie == null) return false;
+            try
+            {
+                if (ie.transform.parent != null && ie.transform.parent.GetComponentInParent<PhysGrabCart>() != null)
+                    return true;
+            }
+            catch { }
+
+            try
+            {
+                if (allCarts != null)
+                {
+                    Vector3 iPos = ie.transform.position;
+                    foreach (var c in allCarts)
+                    {
+                        if (c == null) continue;
+                        Vector3 cPos = c.transform.position;
+                        float dist = Vector3.Distance(iPos, cPos);
+                        if (dist < 1.4f && Mathf.Abs(iPos.y - cPos.y) < 1.0f)
+                            return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        private static bool IsValuableInExtractor(ValuableObject val, List<ExtractionPoint> activeExtractors)
+        {
+            if (val == null) return false;
+            try
+            {
+                if (FieldVoRoomVolumeCheck != null)
+                {
+                    var rvc = FieldVoRoomVolumeCheck.GetValue(val);
+                    if (rvc != null)
+                    {
+                        if (FieldRvcInExtractionPoint != null && (bool)FieldRvcInExtractionPoint.GetValue(rvc))
+                            return true;
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (RoundDirector.instance != null && RoundDirector.instance.dollarHaulList != null)
+                {
+                    if (RoundDirector.instance.dollarHaulList.Contains(val.gameObject))
+                        return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (activeExtractors != null && activeExtractors.Count > 0)
+                {
+                    Vector3 vPos = val.transform.position;
+                    foreach (var ep in activeExtractors)
+                    {
+                        if (ep == null) continue;
+                        Vector3 epPos = ep.extractionTube != null ? ep.extractionTube.position : ep.transform.position;
+                        if (Vector3.Distance(vPos, epPos) < 2.5f)
+                            return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
         private void UpdateEspTargets()
         {
             if (!EnableEsp) return;
@@ -2275,15 +2561,66 @@ namespace RepoModMenu
             }
             catch { }
 
+            // 2. Quét Xe đẩy trước để lấy danh sách phục vụ việc lọc đồ vật (Carts - Type 6)
+            PhysGrabCart[] allCarts = null;
             try
             {
-                // 2. Quét Đồ giá trị (Valuables - Type 1)
+                allCarts = FindObjectsOfType<PhysGrabCart>();
+                if (allCarts != null)
+                {
+                    foreach (var c in allCarts)
+                    {
+                        if (c == null || c.transform == null || !c.gameObject.activeInHierarchy) continue;
+                        newEntries.Add(new EspEntry
+                        {
+                            Transform = c.transform,
+                            Name = "Xe Đẩy",
+                            Type = 6
+                        });
+                    }
+                }
+            }
+            catch { }
+
+            // 3. Quét Extractor (Trạm rút - Type 3) - Ẩn hoàn toàn nếu đã hoàn thành
+            var activeExtractors = new List<ExtractionPoint>();
+            try
+            {
+                var extractors = FindObjectsOfType<ExtractionPoint>();
+                if (extractors != null)
+                {
+                    foreach (var ep in extractors)
+                    {
+                        if (ep == null || ep.transform == null) continue;
+                        if (IsExtractorCompleted(ep)) continue; // Extractor đã xong thì KHÔNG hiện nữa
+                        activeExtractors.Add(ep);
+
+                        Transform t = ep.extractionTube != null ? ep.extractionTube : ep.transform;
+                        newEntries.Add(new EspEntry
+                        {
+                            Transform = t,
+                            CenterOffset = Vector3.up * 1.5f,
+                            Extents = new Vector3(1.6f, 1.5f, 1.6f),
+                            Name = "EXTRACTOR",
+                            Type = 3
+                        });
+                    }
+                }
+            }
+            catch { }
+
+            // 4. Quét Đồ giá trị (Valuables - Type 1) - Bỏ qua đồ đã nằm trong Cart hoặc trong Extractor
+            try
+            {
                 var valuables = FindObjectsOfType<ValuableObject>();
                 if (valuables != null)
                 {
                     foreach (var val in valuables)
                     {
                         if (val == null || val.transform == null) continue;
+                        // Nếu đã nằm trong Xe Đẩy hoặc trong Trạm Rút -> Bỏ qua không hiển thị!
+                        if (IsValuableInCart(val, allCarts) || IsValuableInExtractor(val, activeExtractors)) continue;
+
                         float curVal = FieldVoDollarValueCurrent != null ? (float)FieldVoDollarValueCurrent.GetValue(val) : 0f;
                         int price = Mathf.RoundToInt(curVal);
                         float mass = 0f;
@@ -2325,9 +2662,9 @@ namespace RepoModMenu
             }
             catch { }
 
+            // 5. Quét Đồng đội (Teammates - Type 2)
             try
             {
-                // 3. Quét Đồng đội (Teammates - Type 2)
                 var players = FindObjectsOfType<PlayerAvatar>();
                 if (players != null)
                 {
@@ -2353,32 +2690,9 @@ namespace RepoModMenu
             }
             catch { }
 
+            // 6. Quét Vật phẩm mua bị rơi (Dropped Items - Type 4)
             try
             {
-                // 4. Quét Extractor (Trạm rút - Type 3)
-                var extractors = FindObjectsOfType<ExtractionPoint>();
-                if (extractors != null)
-                {
-                    foreach (var ep in extractors)
-                    {
-                        if (ep == null || ep.transform == null) continue;
-                        Transform t = ep.extractionTube != null ? ep.extractionTube : ep.transform;
-                        newEntries.Add(new EspEntry
-                        {
-                            Transform = t,
-                            CenterOffset = Vector3.up * 1.5f,
-                            Extents = new Vector3(1.6f, 1.5f, 1.6f),
-                            Name = "EXTRACTOR",
-                            Type = 3
-                        });
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                // 5. Quét Vật phẩm mua bị rơi (Dropped Items - Type 4)
                 var items = FindObjectsOfType<ItemEquippable>();
                 if (items != null)
                 {
@@ -2388,6 +2702,7 @@ namespace RepoModMenu
                         if (FieldIeEquippedSpot != null && FieldIeEquippedSpot.GetValue(ie) != null) continue;
                         if (ie.GetComponent<ValuableObject>() != null || ie.GetComponentInParent<ValuableObject>() != null) continue;
                         if (ie.GetComponentInParent<PlayerAvatar>() != null) continue;
+                        if (IsItemInCart(ie, allCarts)) continue; // Nằm trong xe đẩy thì bỏ qua
 
                         string itName = "";
                         var itComp = ie.GetComponent<Item>() ?? ie.GetComponentInParent<Item>();
@@ -2413,9 +2728,9 @@ namespace RepoModMenu
             }
             catch { }
 
+            // 7. Quét Đầu người chơi chết cần cứu (Dead Player Heads - Type 5)
             try
             {
-                // 6. Quét Đầu người chơi chết cần cứu (Dead Player Heads - Type 5)
                 var heads = FindObjectsOfType<PlayerDeathHead>();
                 if (heads != null)
                 {
@@ -2427,26 +2742,6 @@ namespace RepoModMenu
                             Transform = h.transform,
                             Name = "Cứu Đồng Đội",
                             Type = 5
-                        });
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                // 7. Quét Xe đẩy (Carts - Type 6)
-                var carts = FindObjectsOfType<PhysGrabCart>();
-                if (carts != null)
-                {
-                    foreach (var c in carts)
-                    {
-                        if (c == null || c.transform == null || !c.gameObject.activeInHierarchy) continue;
-                        newEntries.Add(new EspEntry
-                        {
-                            Transform = c.transform,
-                            Name = "Xe Đẩy",
-                            Type = 6
                         });
                     }
                 }

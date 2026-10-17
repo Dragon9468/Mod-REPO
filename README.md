@@ -13,20 +13,28 @@ Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standal
    - Tính năng **"📌 Ghim trên cùng"** (Always On Top) giúp bạn vừa chơi game vừa thấy và chỉnh tính năng cheat dễ dàng.
    - **Phím tắt toàn cầu (Global Hotkeys F2 - F10):** Dùng trực tiếp Windows API `GetAsyncKeyState`, bạn có thể bấm phím tắt ngay cả khi đang tập trung chơi game ở chế độ Fullscreen!
 
-2. **Sáng toàn bộ bản đồ & Tầm nhìn siêu xa (Map-wide Fullbright & Infinite Vision):**
+2. **Sáng toàn bộ bản đồ, Tầm nhìn siêu xa & Lược giản hóa địa hình (Fullbright + Terrain Simplification):**
    - Mở rộng tầm nhìn của Camera (`FarClipPlane = 1000m`) và xóa sạch sương mù, giúp nhìn thông suốt toàn bộ bản đồ mà không bị cụt hay giới hạn tầm nhìn phía xa.
-   - Chiếu sáng rực rỡ mọi góc tối mà không gây chói.
+   - Chiếu sáng rực rỡ mọi góc tối mà không gây chói mắt.
+   - **Lược giản hóa địa hình & môi trường (Cực mạnh cho CPU & RAM):**
+     - Tắt bỏ hoàn toàn cỏ 3D dày đặc và bụi cây rậm rạp trên địa hình (`detailObjectDensity = 0`, `drawTreesAndFoliage = false`).
+     - Tối giản hóa lưới đa giác bề mặt địa hình (`heightmapPixelError = 150f`).
+     - Ép toàn bộ mô hình (props/dungeon) về mức đa giác thấp nhất (`QualitySettings.maximumLODLevel = 1`, `lodBias = 0.35f`).
+     - Tắt bóng đổ và hạ tải các ngọn đèn phụ thừa thãi trong hầm ngục.
+     - Dọn dẹp các hệ thống hạt khói bụi môi trường lặp vô hạn.
+     - Tự động dọn dẹp RAM và thu hồi tài nguyên rác (`GC.Collect` & `Resources.UnloadUnusedAssets`).
 
 3. **Chống rung lắc Camera (Anti Camera Shake & Head Bobbing):**
    - Loại bỏ 100% rung chấn camera, nhún bước chân khi đi bộ/chạy nước rút và giật nảy khi tiếp đất.
    - Giúp di chuyển mượt mà, dễ chịu, chống chóng mặt và say xe tuyệt đối.
 
-4. **ESP Nhìn Xuyên Tường Tối Giản & Chuẩn Xác (ESP v3.0 - Siêu Nhẹ):**
+4. **ESP Nhìn Xuyên Tường Thông Minh & Tối Giản (ESP v3.1 - Siêu Nhẹ):**
    - 🟥 **Chỉ vẽ Khung Hộp 3D cho Quái vật (Enemies Only):** Hộp chữ nhật 3D Wireframe đỏ rực bao trọn cơ thể quái vật, đi kèm tên quái vật và khoảng cách.
-   - 🟨 **Vật phẩm & Đồ đạc (Valuables):** Đã loại bỏ khung hộp 3D lệch tâm rườm rà; thay bằng nhãn huy hiệu 2D định vị ngay tâm hình học vật thể `[$Giá | Khối lượng] (Khoảng cách)`.
+   - 🟨 **Vật phẩm & Đồ đạc (Valuables):** Huy hiệu 2D định vị ngay tâm hình học vật thể `[$Giá | Khối lượng] (Khoảng cách)`.
+     - **Tự động ẩn đồ đã cất:** Những món đồ nào đã bỏ vào trong **Xe đẩy (Cart)** hoặc hút vào trong **Trạm Rút Tiền (Extractor)** sẽ tự động biến mất khỏi màn hình, tránh rối mắt!
+   - 🟩 **Trạm Rút Tiền (Extractor):** Nhãn 2D xanh lá `[🚀 EXTRACTOR]`. **Tự động ẩn ngay khi trạm đã hoàn thành rút tiền (Complete)!**
    - 🟦 **Đồng đội (Players):** Nhãn 2D cyan định vị tên và khoảng cách.
-   - 🟩 **Trạm Rút Tiền (Extractor):** Nhãn 2D xanh lá `[🚀 EXTRACTOR]` hiển thị khoảng cách.
-   - 🟣 **Chỉ báo chấm màu tinh gọn:** Đồ mua shop rơi đất (Tím), Đầu đồng đội hi sinh (Cam), Xe đẩy hàng (Vàng).
+   - 🟣 **Chỉ báo chấm màu tinh gọn:** Đồ mua shop rơi đất (Tím - tự ẩn khi cất vào xe đẩy), Đầu đồng đội hi sinh (Cam), Xe đẩy hàng (Vàng).
    - *Giảm 98% số phép tính ma trận và vẽ đường kẻ GUI, giúp FPS luôn mượt mà khi bật ESP.*
 
 5. **⚡ Siêu Tối Ưu FPS & Phần Cứng (Dành riêng cho CPU i3 / iGPU Laptop):**
