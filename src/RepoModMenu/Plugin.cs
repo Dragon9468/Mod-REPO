@@ -123,8 +123,8 @@ namespace RepoModMenu
         private bool origFog;
         private float origFogDensity;
 
-        // Camera Shake & Bobbing Elimination
-        public static bool DisableCameraShake = true;
+        // Camera Shake & Bobbing Elimination (Mặc định đi kèm mod Sáng Map)
+        public static bool DisableCameraShake = false;
 
         // ESP X-Ray & 3D Bounding Boxes
         public class EspEntry
@@ -545,16 +545,17 @@ namespace RepoModMenu
             if (Time.unscaledTime - lastFullbrightTime < 0.35f) return;
             lastFullbrightTime = Time.unscaledTime;
             EnableFullbright = !EnableFullbright;
+            DisableCameraShake = EnableFullbright;
             if (EnableFullbright)
             {
                 ApplyTerrainAndSceneSimplification(true);
                 try { System.GC.Collect(); Resources.UnloadUnusedAssets(); } catch { }
-                ShowNotification("Sáng Toàn Map & Lược Giản Địa Hình (Siêu Tối Ưu CPU/RAM): BẬT");
+                ShowNotification("Sáng Toàn Map & Chống Rung Camera (Kèm Tối Ưu): BẬT");
             }
             else
             {
                 ApplyTerrainAndSceneSimplification(false);
-                ShowNotification("Fullbright & Lược Giản Địa Hình: TẮT");
+                ShowNotification("Sáng Toàn Map & Chống Rung Camera: TẮT");
             }
         }
 
@@ -1102,7 +1103,7 @@ namespace RepoModMenu
             ApplyNoclip();
             ApplyMapLighting();
 
-            if (DisableCameraShake)
+            if (DisableCameraShake || EnableFullbright)
             {
                 ApplyNoCameraShake();
             }

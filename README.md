@@ -13,9 +13,10 @@ Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standal
    - Tính năng **"📌 Ghim trên cùng"** (Always On Top) giúp bạn vừa chơi game vừa thấy và chỉnh tính năng cheat dễ dàng.
    - **Phím tắt toàn cầu (Global Hotkeys F2 - F10):** Dùng trực tiếp Windows API `GetAsyncKeyState`, bạn có thể bấm phím tắt ngay cả khi đang tập trung chơi game ở chế độ Fullscreen!
 
-2. **Sáng toàn bộ bản đồ, Tầm nhìn siêu xa & Lược giản hóa địa hình (Fullbright + Terrain Simplification):**
+2. **Sáng toàn bộ bản đồ, Chống rung & Lược giản hóa địa hình (Fullbright + Anti-Shake + Optimization):**
    - Mở rộng tầm nhìn của Camera (`FarClipPlane = 1000m`) và xóa sạch sương mù, giúp nhìn thông suốt toàn bộ bản đồ mà không bị cụt hay giới hạn tầm nhìn phía xa.
    - Chiếu sáng rực rỡ mọi góc tối mà không gây chói mắt.
+   - **Tích hợp sẵn Tắt Rung Lắc Camera:** Tự động loại bỏ 100% rung chấn camera, nhún bước chân khi đi bộ/chạy nước rút và giật nảy khi tiếp đất khi bật mod Sáng Map (giúp menu gọn gàng, không cần checkbox riêng).
    - **Lược giản hóa địa hình & môi trường (Cực mạnh cho CPU & RAM):**
      - Tắt bỏ hoàn toàn cỏ 3D dày đặc và bụi cây rậm rạp trên địa hình (`detailObjectDensity = 0`, `drawTreesAndFoliage = false`).
      - Tối giản hóa lưới đa giác bề mặt địa hình (`heightmapPixelError = 150f`).
@@ -24,11 +25,7 @@ Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standal
      - Dọn dẹp các hệ thống hạt khói bụi môi trường lặp vô hạn.
      - Tự động dọn dẹp RAM và thu hồi tài nguyên rác (`GC.Collect` & `Resources.UnloadUnusedAssets`).
 
-3. **Chống rung lắc Camera (Anti Camera Shake & Head Bobbing):**
-   - Loại bỏ 100% rung chấn camera, nhún bước chân khi đi bộ/chạy nước rút và giật nảy khi tiếp đất.
-   - Giúp di chuyển mượt mà, dễ chịu, chống chóng mặt và say xe tuyệt đối.
-
-4. **ESP Nhìn Xuyên Tường Thông Minh & Tối Giản (ESP v3.2 - Siêu Nhẹ):**
+3. **ESP Nhìn Xuyên Tường Thông Minh & Tối Giản (ESP v3.2 - Siêu Nhẹ):**
    - 🟥 **Chỉ vẽ Khung Hộp 3D cho Quái vật (Enemies Only):** Hộp chữ nhật 3D Wireframe đỏ rực bao trọn cơ thể quái vật, đi kèm tên quái vật và khoảng cách.
    - 🟨 **Vật phẩm & Đồ đạc (Valuables):** Huy hiệu 2D định vị ngay tâm hình học vật thể `[$Giá | Khối lượng] (Khoảng cách)`.
      - **Tự động ẩn đồ đã cất:** Những món đồ nào đã bỏ vào trong **Xe đẩy (Cart)**, cất vào thùng sau **Xe Hauler** hoặc hút vào trong **Trạm Rút Tiền (Extractor)** sẽ tự động biến mất khỏi màn hình, tránh rối mắt!
@@ -38,31 +35,32 @@ Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standal
    - 🟣 **Chỉ báo chấm màu tinh gọn:** Đồ mua shop rơi đất (Tím - tự ẩn khi cất vào xe đẩy/xe hauler), Đầu đồng đội hi sinh (Cam).
    - *Giảm 98% số phép tính ma trận và vẽ đường kẻ GUI, giúp FPS luôn mượt mà khi bật ESP.*
 
-5. **⚡ Siêu Tối Ưu FPS & Phần Cứng (Dành riêng cho CPU i3 / iGPU Laptop):**
-   - **Tối đa hóa CPU:** Tự động nâng Process Priority của game lên `High Priority` và Main Thread lên `AboveNormal`.
+4. **⚡ Siêu Tối Ưu FPS & Phần Cứng Tự Động (Chạy ngầm liên tục cho CPU i3 / iGPU Laptop):**
+   - **Tối đa hóa CPU:** Tự động nâng Process Priority của game lên `High Priority` và Main Thread lên `AboveNormal` liên tục trong nền.
    - **Cắt giảm nghẽn CPU:**
      - Giảm tính toán biến dạng khung xương nhân vật/quái (`SkinWeights.OneBone` - giảm 75% CPU skinning).
      - Cache toàn bộ danh sách đối tượng (chống rung camera, map lighting, aimbot) theo chu kỳ tick thay vì gọi `FindObjectsOfType` hàng trăm lần mỗi giây.
      - Vô hiệu hóa tính toán đổ bóng thời gian thực (`ShadowQuality.Disable`, `shadowDistance = 0f`), hạ LOD Bias.
      - Tắt VSync và mở khóa `targetFrameRate` giúp tận dụng tối đa chu kỳ xử lý của CPU & card onboard iGPU.
+   - *Hoạt động tự động ngầm trên máy, không cần hiển thị trên menu để tránh rối mắt.*
 
-6. **Kho Đồ Đi Chợ (Shop Items Spawner) `[Chỉ Host]`:**
+5. **Kho Đồ Đi Chợ (Shop Items Spawner) `[Chỉ Host]`:**
    - Tự do lấy mọi vật phẩm: Súng Laser, Súng Tranq, Drone Hồi Máu, Drone Pin, Lựu đạn nổ, Lựu đạn Stun, Búa tạ Melee, v.v.
    - Nút **`🎒 [+ CẤT VÀO BALO]`**: Đưa thẳng vào ô trống trong balo để bấm phím số dùng ngay lập tức.
    - Nút **`📦 Thả ra đất trước mặt`**: Spawn trực tiếp dưới đất cho bạn hoặc đồng đội nhặt.
    - *Lưu ý: Tính năng sinh đồ (Spawn Item) cần quyền Máy Chủ (Host) để vật thể đồng bộ qua mạng tới người chơi khác.*
 
-7. **Max All Upgrades & Siêu Cánh Tay (1-Click):**
+6. **Max All Upgrades & Siêu Cánh Tay (1-Click):**
    - Tăng máu tối đa lên 250 HP, hồi đầy máu, nhảy 5 lần liên tiếp trên không, nhân đôi thể lực, mở khóa Đôi Cánh (Tumble Wings).
    - **Tay hút đồ siêu xa & siêu khỏe:** Tầm với lên đến **25m**, lực nâng cực đại **5000f**, lực giữ **1500f**, dễ dàng nhấc và kéo mọi đồ vật siêu nặng từ xa mà không sợ tuột tay.
 
-8. **Client-side 100% trong phòng Multiplayer (Chơi chung bạn bè):**
+7. **Client-side 100% trong phòng Multiplayer (Chơi chung bạn bè):**
    - Speed Hack tùy chỉnh độ nhanh (1.0x - 6.0x).
    - Vô hạn Double Jump / Bay nhảy trên không.
    - Vô hạn Thể lực (Infinite Stamina).
    - Chống té ngã / lộn nhào (Anti-Tumble).
    - Bất tử (God Mode).
-   - Tắt rung lắc camera.
+   - Sáng map & Tự động chống rung lắc camera.
 
 ---
 
@@ -78,7 +76,7 @@ Phím tắt hoạt động cả khi đang ở trong cửa sổ game hoặc ngoà
 | **F4** | **Infinite Stamina** | Vô hạn thể lực, chạy liên tục không mệt |
 | **F5** | **Anti-Tumble** | Chống ngã té / lộn nhào / choáng khi va đập mạnh |
 | **F6** | **God Mode** | Bất tử tuyệt đối, không nhận sát thương từ quái hay bẫy |
-| **F7** | **Fullbright & Far View** | **SÁNG TOÀN BỘ BẢN ĐỒ** & Mở rộng tầm nhìn xa 1000m, Xóa sương mù |
+| **F7** | **Fullbright & Anti-Shake** | **SÁNG TOÀN BỘ BẢN ĐỒ**, Chống rung lắc camera & Lược giản địa hình |
 | **F8** | **ESP Tối Giản** | Quái (Khung hộp 3D Đỏ), Valuables (Huy hiệu 2D Vàng Giá/Khối lượng), Đồng đội/Extractor (2D), Đồ rơi/Xe đẩy (Chấm màu) |
 | **F9** | **Instant Heal** | Hồi phục 100% Máu ngay tức khắc |
 | **F10** | **Instant Revive** | Hồi sinh đồng đội hoặc bản thân lập tức khi gục ngã |

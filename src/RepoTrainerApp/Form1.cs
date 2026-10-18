@@ -31,8 +31,6 @@ namespace RepoTrainerApp
         private CheckBox chkTumble;
         private CheckBox chkGod;
         private CheckBox chkFullbright;
-        private CheckBox chkNoCameraShake;
-        private CheckBox chkOptimizeFps;
         private CheckBox chkEsp;
         private CheckBox chkAimbot;
 
@@ -183,7 +181,7 @@ namespace RepoTrainerApp
         private void InitializeComponent()
         {
             this.Text = "★ R.E.P.O. Master External Trainer v2.1 ★";
-            this.Size = new Size(590, 835);
+            this.Size = new Size(590, 785);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.BackColor = Color.FromArgb(24, 25, 29);
             this.ForeColor = Color.White;
@@ -234,7 +232,7 @@ namespace RepoTrainerApp
             {
                 Text = " 🏃 DI CHUYỂN (MOVEMENT) ",
                 Location = new Point(15, currentY),
-                Size = new Size(545, 160),
+                Size = new Size(545, 130),
                 ForeColor = Color.SkyBlue,
                 Font = titleFont
             };
@@ -321,32 +319,8 @@ namespace RepoTrainerApp
             chkTumble.Click += async (s, e) => await SendCommand("toggle_tumble");
             gbMovement.Controls.Add(chkTumble);
 
-            chkNoCameraShake = new CheckBox
-            {
-                Text = "🚫 Tắt rung lắc camera",
-                Location = new Point(15, 126),
-                Size = new Size(240, 25),
-                Font = itemFont,
-                ForeColor = Color.LightPink,
-                Checked = true
-            };
-            chkNoCameraShake.Click += async (s, e) => await SendCommand("toggle_camera_shake");
-            gbMovement.Controls.Add(chkNoCameraShake);
-
-            chkOptimizeFps = new CheckBox
-            {
-                Text = "⚡ Siêu Tối Ưu FPS (i3/iGPU)",
-                Location = new Point(275, 126),
-                Size = new Size(255, 25),
-                Font = itemFont,
-                ForeColor = Color.LightSkyBlue,
-                Checked = true
-            };
-            chkOptimizeFps.Click += async (s, e) => await SendCommand("toggle_optimize");
-            gbMovement.Controls.Add(chkOptimizeFps);
-
             this.Controls.Add(gbMovement);
-            currentY += 170;
+            currentY += 140;
 
             // 3. Nhóm Sinh tồn, Ánh sáng & Xe Truck (Survival, Light & Truck)
             var gbHealth = new GroupBox
@@ -362,7 +336,7 @@ namespace RepoTrainerApp
             {
                 Text = "[F6] Bất tử",
                 Location = new Point(15, 26),
-                Size = new Size(125, 25),
+                Size = new Size(110, 25),
                 Font = itemFont,
                 ForeColor = Color.White
             };
@@ -371,9 +345,9 @@ namespace RepoTrainerApp
 
             chkFullbright = new CheckBox
             {
-                Text = "[F7] Sáng map",
-                Location = new Point(145, 26),
-                Size = new Size(130, 25),
+                Text = "[F7] Sáng map (Chống rung)",
+                Location = new Point(130, 26),
+                Size = new Size(205, 25),
                 Font = itemFont,
                 ForeColor = Color.White
             };
@@ -383,8 +357,8 @@ namespace RepoTrainerApp
             chkEsp = new CheckBox
             {
                 Text = "[F8] ESP Xuyên Tường",
-                Location = new Point(285, 26),
-                Size = new Size(240, 25),
+                Location = new Point(340, 26),
+                Size = new Size(195, 25),
                 Font = itemFont,
                 ForeColor = Color.Gold
             };
@@ -706,8 +680,6 @@ namespace RepoTrainerApp
                     chkGod.Checked = res.Contains("\"god\":true");
                     chkTumble.Checked = res.Contains("\"tumble\":true");
                     chkFullbright.Checked = res.Contains("\"fullbright\":true");
-                    chkNoCameraShake.Checked = res.Contains("\"noCameraShake\":true");
-                    chkOptimizeFps.Checked = res.Contains("\"optimizeFps\":true");
                     chkEsp.Checked = res.Contains("\"esp\":true");
                     chkAimbot.Checked = res.Contains("\"aimbot\":true");
                     chkTruckEnergy.Checked = res.Contains("\"truckenergy\":true");
