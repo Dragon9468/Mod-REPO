@@ -39,22 +39,12 @@ Bản mod & ứng dụng Trainer ngoài độc lập dạng rời rạc (Standal
    - *Giảm 98% số phép tính ma trận và vẽ đường kẻ GUI, giúp FPS luôn mượt mà khi bật ESP.*
 
 5. **⚡ Siêu Tối Ưu FPS & Phần Cứng (Dành riêng cho CPU i3 / iGPU Laptop):**
-   - **Tối đa hóa CPU & Gán nhân luồng (Affinity):**
-     - Tự động gán toàn bộ nhân luồng logic (`ProcessorAffinity`) của CPU cho tiến trình game.
-     - Nâng Process Priority lên `High Priority` và Main Thread lên `AboveNormal`.
-   - **Cắt giảm nghẽn CPU Main Thread (PhysX Engine Tuning):**
-     - Giảm số bước tính va chạm vật lý của Unity PhysX (`defaultSolverIterations = 2` thay vì 6, `defaultSolverVelocityIterations = 1`).
-     - Tăng ngưỡng nghỉ `sleepThreshold = 0.15f` giúp đồ vật rơi xuống sàn nghỉ ngay lập tức, không tốn CPU tính toán dao động.
-     - Tối ưu chu kỳ tick vật lý (`Time.fixedDeltaTime = 0.0333s` thay vì 0.02s) giúp giảm 35-40% gánh nặng CPU Main Thread.
+   - **Tối đa hóa CPU:** Tự động nâng Process Priority của game lên `High Priority` và Main Thread lên `AboveNormal`.
+   - **Cắt giảm nghẽn CPU:**
      - Giảm tính toán biến dạng khung xương nhân vật/quái (`SkinWeights.OneBone` - giảm 75% CPU skinning).
      - Cache toàn bộ danh sách đối tượng (chống rung camera, map lighting, aimbot) theo chu kỳ tick thay vì gọi `FindObjectsOfType` hàng trăm lần mỗi giây.
-   - **Giải phóng iGPU Onboard (Intel HD Graphics 620):**
-     - Tắt toàn bộ lớp hậu kỳ `PostProcessLayer` & `PostProcessVolume` (Bloom, SSAO, Motion Blur, Depth of Field...) - kẻ thù số 1 gây tụt FPS trên iGPU.
-     - Tắt HDR (`allowHDR = false`) và MSAA (`allowMSAA = false`) để giải phóng băng thông bộ nhớ RAM chia sẻ.
-     - Vô hiệu hóa tính toán đổ bóng thời gian thực (`ShadowQuality.Disable`, `shadowDistance = 0f`), tắt Cascades, hạ LOD Bias.
+     - Vô hiệu hóa tính toán đổ bóng thời gian thực (`ShadowQuality.Disable`, `shadowDistance = 0f`), hạ LOD Bias.
      - Tắt VSync và mở khóa `targetFrameRate` giúp tận dụng tối đa chu kỳ xử lý của CPU & card onboard iGPU.
-   - **📺 Nút "Ép độ phân giải 720p" (Cứu tinh iGPU Intel HD):**
-     - Trên màn hình 1080p, iGPU Intel không thể gánh nổi 2 triệu pixel. Bật tùy chọn này sẽ ép game render ở 1280x720 (giảm 55% tải pixel), giúp FPS tăng vọt gấp đôi mà hình ảnh vẫn rõ ràng, dễ nhìn!
 
 6. **Kho Đồ Đi Chợ (Shop Items Spawner) `[Chỉ Host]`:**
    - Tự do lấy mọi vật phẩm: Súng Laser, Súng Tranq, Drone Hồi Máu, Drone Pin, Lựu đạn nổ, Lựu đạn Stun, Búa tạ Melee, v.v.

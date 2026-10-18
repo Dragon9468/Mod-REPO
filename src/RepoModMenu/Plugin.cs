@@ -435,40 +435,10 @@ namespace RepoModMenu
                    $"\"fullbright\":{EnableFullbright.ToString().ToLower()}," +
                    $"\"noCameraShake\":{DisableCameraShake.ToString().ToLower()}," +
                    $"\"optimizeFps\":{EnablePerformanceOptimization.ToString().ToLower()}," +
-                   $"\"lowres\":{EnableLowResMode.ToString().ToLower()}," +
                    $"\"esp\":{EnableEsp.ToString().ToLower()}," +
                    $"\"aimbot\":{EnableAimbot.ToString().ToLower()}," +
                    $"\"truckEnergy\":{EnableInfiniteTruckEnergy.ToString().ToLower()}," +
                    $"\"truckenergy\":{EnableInfiniteTruckEnergy.ToString().ToLower()}}}";
-        }
-
-        public static bool EnableLowResMode = false;
-        private static int originalScreenWidth = -1;
-        private static int originalScreenHeight = -1;
-
-        private void ToggleLowResMode()
-        {
-            EnableLowResMode = !EnableLowResMode;
-            if (EnableLowResMode)
-            {
-                if (originalScreenWidth <= 0)
-                {
-                    originalScreenWidth = Screen.width;
-                    originalScreenHeight = Screen.height;
-                }
-                Screen.SetResolution(1280, 720, FullScreenMode.FullScreenWindow);
-                ShowNotification("📺 Ép độ phân giải 720p: BẬT (Giảm 55% tải pixel cho iGPU Intel)");
-            }
-            else
-            {
-                int w = originalScreenWidth > 0 ? originalScreenWidth : Display.main.systemWidth;
-                int h = originalScreenHeight > 0 ? originalScreenHeight : Display.main.systemHeight;
-                if (w > 0 && h > 0)
-                {
-                    Screen.SetResolution(w, h, FullScreenMode.FullScreenWindow);
-                }
-                ShowNotification("Khôi phục độ phân giải gốc của màn hình");
-            }
         }
 
         private void TogglePerformanceOptimization()
@@ -489,15 +459,13 @@ namespace RepoModMenu
         {
             try
             {
-                // 1. Ép Process chạy độ ưu tiên cao trong Windows (High Priority) & gán toàn bộ nhân luồng CPU
+                // 1. Ép Process chạy độ ưu tiên cao trong Windows (High Priority)
                 using (var proc = Process.GetCurrentProcess())
                 {
                     if (proc.PriorityClass != ProcessPriorityClass.High)
                     {
                         proc.PriorityClass = ProcessPriorityClass.High;
                     }
-                    // Gán toàn bộ số luồng logic của CPU (4 luồng của i3) cho tiến trình game
-                    proc.ProcessorAffinity = (IntPtr)((1 << Environment.ProcessorCount) - 1);
                 }
                 Thread.CurrentThread.Priority = System.Threading.ThreadPriority.AboveNormal;
             }
@@ -505,31 +473,16 @@ namespace RepoModMenu
 
             try
             {
-                // 2. Cắt giảm gánh nặng PhysX trên Main Thread CPU
-                // Mặc định Unity tính solver 6 lần, giảm xuống 2 lần để giảm nghẽn CPU
-                Physics.defaultSolverIterations = 2;
-                Physics.defaultSolverVelocityIterations = 1;
-                // Tăng ngưỡng sleep: đồ vật nằm yên trên sàn sẽ ngưng tính vật lý ngay lập tức
-                Physics.sleepThreshold = 0.15f;
-                // Cắt giảm tần số tick va chạm vật lý từ 50Hz (0.02s) xuống 33Hz (0.03s) -> Giảm 35-40% CPU physics
-                Time.fixedDeltaTime = 0.033333f;
-            }
-            catch { }
-
-            try
-            {
-                // 3. Tinh chỉnh Unity QualitySettings giải phóng CPU & iGPU Intel
+                // 2. Tinh chỉnh Unity QualitySettings giải phóng CPU & iGPU Intel
                 QualitySettings.vSyncCount = 0; // Bỏ vSync tránh nghẽn luồng render
                 Application.targetFrameRate = -1; // Mở khóa FPS
 
                 // Tắt bóng đổ (ngốn CPU Draw Calls & iGPU Fillrate nhất)
                 QualitySettings.shadows = ShadowQuality.Disable;
                 QualitySettings.shadowDistance = 0f;
-                QualitySettings.shadowCascades = 0;
 
                 // Tắt khử răng cưa / lọc bề mặt nặng
                 QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
-                QualitySettings.antiAliasing = 0;
 
                 // SkinWeights.OneBone: Cắt giảm 75% tính toán ma trận xương trên CPU khi vẽ quái và đồng đội
                 QualitySettings.skinWeights = SkinWeights.OneBone;
@@ -543,32 +496,6 @@ namespace RepoModMenu
                 // Giảm bớt số đa giác vật thể ở xa (LOD Bias thấp)
                 QualitySettings.lodBias = 0.55f;
                 QualitySettings.maximumLODLevel = 0;
-            }
-            catch { }
-
-            try
-            {
-                // 4. Giải phóng Camera và tắt Post-Processing (Bloom, SSAO, Motion Blur...) - Kẻ thù số 1 của iGPU
-                var cam = Camera.main ?? Camera.current;
-                if (cam != null)
-                {
-                    cam.allowHDR = false; // Tắt HDR để giải phóng băng thông RAM chia sẻ
-                    cam.allowMSAA = false;
-
-                    var behaviours = cam.GetComponents<MonoBehaviour>();
-                    if (behaviours != null)
-                    {
-                        foreach (var b in behaviours)
-                        {
-                            if (b == null) continue;
-                            string typeName = b.GetType().FullName;
-                            if (typeName.Contains("PostProcess") || typeName.Contains("PostProcessing"))
-                            {
-                                b.enabled = false;
-                            }
-                        }
-                    }
-                }
             }
             catch { }
         }
@@ -729,9 +656,6 @@ namespace RepoModMenu
                 case "toggle_optimize":
                 case "optimize_cpu":
                     TogglePerformanceOptimization();
-                    break;
-                case "toggle_low_res":
-                    ToggleLowResMode();
                     break;
                 case "toggle_esp":
                     ToggleEsp();
