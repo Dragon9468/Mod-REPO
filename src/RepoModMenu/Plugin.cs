@@ -2292,7 +2292,7 @@ namespace RepoModMenu
             return false;
         }
 
-        private static bool IsValuableInCart(ValuableObject val, PhysGrabCart[] allCarts)
+        private static bool IsValuableInCart(ValuableObject val, PhysGrabCart[] allCarts, ItemVehicle[] allVehicles = null)
         {
             if (val == null) return false;
             try
@@ -2307,8 +2307,12 @@ namespace RepoModMenu
 
             try
             {
-                if (val.transform.parent != null && val.transform.parent.GetComponentInParent<PhysGrabCart>() != null)
-                    return true;
+                if (val.transform.parent != null)
+                {
+                    if (val.transform.parent.GetComponentInParent<PhysGrabCart>() != null) return true;
+                    if (val.transform.parent.GetComponentInParent<ItemVehicle>() != null) return true;
+                    if (val.transform.parent.GetComponentInParent<ItemValuableBox>() != null) return true;
+                }
             }
             catch { }
 
@@ -2329,16 +2333,43 @@ namespace RepoModMenu
             }
             catch { }
 
+            try
+            {
+                if (allVehicles != null)
+                {
+                    Vector3 vPos = val.transform.position;
+                    foreach (var v in allVehicles)
+                    {
+                        if (v == null) continue;
+                        // Kiểm tra nếu xe có valuableBox (Hauler)
+                        if (v.valuableBox != null)
+                        {
+                            Vector3 boxPos = v.valuableBox.transform.position;
+                            if (Vector3.Distance(vPos, boxPos) < 2.2f)
+                                return true;
+                        }
+                        Vector3 vehPos = v.transform.position;
+                        if (Vector3.Distance(vPos, vehPos) < 2.5f && Mathf.Abs(vPos.y - vehPos.y) < 1.5f)
+                            return true;
+                    }
+                }
+            }
+            catch { }
+
             return false;
         }
 
-        private static bool IsItemInCart(ItemEquippable ie, PhysGrabCart[] allCarts)
+        private static bool IsItemInCart(ItemEquippable ie, PhysGrabCart[] allCarts, ItemVehicle[] allVehicles = null)
         {
             if (ie == null) return false;
             try
             {
-                if (ie.transform.parent != null && ie.transform.parent.GetComponentInParent<PhysGrabCart>() != null)
-                    return true;
+                if (ie.transform.parent != null)
+                {
+                    if (ie.transform.parent.GetComponentInParent<PhysGrabCart>() != null) return true;
+                    if (ie.transform.parent.GetComponentInParent<ItemVehicle>() != null) return true;
+                    if (ie.transform.parent.GetComponentInParent<ItemValuableBox>() != null) return true;
+                }
             }
             catch { }
 
@@ -2353,6 +2384,28 @@ namespace RepoModMenu
                         Vector3 cPos = c.transform.position;
                         float dist = Vector3.Distance(iPos, cPos);
                         if (dist < 1.4f && Mathf.Abs(iPos.y - cPos.y) < 1.0f)
+                            return true;
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (allVehicles != null)
+                {
+                    Vector3 iPos = ie.transform.position;
+                    foreach (var v in allVehicles)
+                    {
+                        if (v == null) continue;
+                        if (v.valuableBox != null)
+                        {
+                            Vector3 boxPos = v.valuableBox.transform.position;
+                            if (Vector3.Distance(iPos, boxPos) < 2.2f)
+                                return true;
+                        }
+                        Vector3 vehPos = v.transform.position;
+                        if (Vector3.Distance(iPos, vehPos) < 2.5f && Mathf.Abs(iPos.y - vehPos.y) < 1.5f)
                             return true;
                     }
                 }
@@ -2561,8 +2614,9 @@ namespace RepoModMenu
             }
             catch { }
 
-            // 2. Quét Xe đẩy trước để lấy danh sách phục vụ việc lọc đồ vật (Carts - Type 6)
+            // 2. Quét Xe đẩy & Xe Hauler trước để lấy danh sách phục vụ việc lọc đồ vật (Carts / Vehicles - Type 6)
             PhysGrabCart[] allCarts = null;
+            ItemVehicle[] allVehicles = null;
             try
             {
                 allCarts = FindObjectsOfType<PhysGrabCart>();
@@ -2575,6 +2629,27 @@ namespace RepoModMenu
                         {
                             Transform = c.transform,
                             Name = "Xe Đẩy",
+                            Type = 6
+                        });
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                allVehicles = FindObjectsOfType<ItemVehicle>();
+                if (allVehicles != null)
+                {
+                    foreach (var v in allVehicles)
+                    {
+                        if (v == null || v.transform == null || !v.gameObject.activeInHierarchy) continue;
+                        // Nếu có valuableBox thì là Hauler, ngược lại là Scout
+                        string vName = (v.valuableBox != null) ? "Hauler" : "Xe Scout";
+                        newEntries.Add(new EspEntry
+                        {
+                            Transform = v.transform,
+                            Name = vName,
                             Type = 6
                         });
                     }
@@ -2609,7 +2684,7 @@ namespace RepoModMenu
             }
             catch { }
 
-            // 4. Quét Đồ giá trị (Valuables - Type 1) - Bỏ qua đồ đã nằm trong Cart hoặc trong Extractor
+            // 4. Quét Đồ giá trị (Valuables - Type 1) - Bỏ qua đồ đã nằm trong Cart, Hauler hoặc Extractor
             try
             {
                 var valuables = FindObjectsOfType<ValuableObject>();
@@ -2618,8 +2693,8 @@ namespace RepoModMenu
                     foreach (var val in valuables)
                     {
                         if (val == null || val.transform == null) continue;
-                        // Nếu đã nằm trong Xe Đẩy hoặc trong Trạm Rút -> Bỏ qua không hiển thị!
-                        if (IsValuableInCart(val, allCarts) || IsValuableInExtractor(val, activeExtractors)) continue;
+                        // Nếu đã nằm trong Xe Đẩy, Xe Hauler hoặc trong Trạm Rút -> Bỏ qua không hiển thị!
+                        if (IsValuableInCart(val, allCarts, allVehicles) || IsValuableInExtractor(val, activeExtractors)) continue;
 
                         float curVal = FieldVoDollarValueCurrent != null ? (float)FieldVoDollarValueCurrent.GetValue(val) : 0f;
                         int price = Mathf.RoundToInt(curVal);
@@ -2702,7 +2777,7 @@ namespace RepoModMenu
                         if (FieldIeEquippedSpot != null && FieldIeEquippedSpot.GetValue(ie) != null) continue;
                         if (ie.GetComponent<ValuableObject>() != null || ie.GetComponentInParent<ValuableObject>() != null) continue;
                         if (ie.GetComponentInParent<PlayerAvatar>() != null) continue;
-                        if (IsItemInCart(ie, allCarts)) continue; // Nằm trong xe đẩy thì bỏ qua
+                        if (IsItemInCart(ie, allCarts, allVehicles)) continue; // Nằm trong xe đẩy hoặc xe Hauler thì bỏ qua
 
                         string itName = "";
                         var itComp = ie.GetComponent<Item>() ?? ie.GetComponentInParent<Item>();
@@ -2935,7 +3010,7 @@ namespace RepoModMenu
                             style = espDeadHeadStyle;
                             break;
                         case 6:
-                            label = $"🛒 Xe Đẩy ({dist:0}m)";
+                            label = $"🛒 {entry.Name} ({dist:0}m)";
                             style = espCartStyle;
                             break;
                         default:
